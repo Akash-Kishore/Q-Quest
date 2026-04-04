@@ -1,0 +1,30 @@
+feat: implement Phase 1 — 6-qubit quantum simulator
+
+Architecture:
+- 6-qubit state vector (64-dimensional complex amplitudes)
+- Partial trace reduced density matrix for per-qubit Bloch sphere
+- Full tensor product system matrix construction
+- Gate replay engine for undo/remove operations
+
+Components:
+- Real-time Bloch sphere (Three.js, 60fps, motion trails)
+- 6 mini Bloch spheres with entanglement arc visualization
+- Drag-and-drop circuit board with blueprint aesthetic
+- State vector panel with phase arc indicators
+- Linear algebra panel (tensor notation + matrix display)
+- Measurement probability chart (64 basis states)
+
+Visual System (PDF Art Doc v3.0):
+- Quantum particle field background (VF-01)
+- Custom cursor with trail effect (VF-02)
+- Bloch sphere motion trails (VF-03)
+- Entanglement SVG visualizer (VF-04)
+- Dynamic complexity bloom (VF-05)
+- Gate snap animation + ripple (VF-06)
+- 3D tilt micro-interaction (VF-07)
+- Living probability bars (VF-08)
+- Aurora state vector display (VF-09)
+- Live header status indicator (VF-10)
+
+Design: JeskoJets-grade minimal — Space Grotesk + JetBrains Mono
+        blueprint circuit aesthetic, precision data panels
