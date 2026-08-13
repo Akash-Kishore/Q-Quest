@@ -1,0 +1,38 @@
+.uiContainer {
+  position: relative;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.overlayTopLeft,
+.overlayTopRight,
+.overlayBottomLeft {
+  position: fixed;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.4em;
+  pointer-events: none;
+}
+
+.overlayTopLeft {
+  top: 2rem;
+  left: 3rem;
+}
+
+.overlayTopRight {
+  top: 2rem;
+  right: 3rem;
+}
+
+.overlayBottomLeft {
+  bottom: 2rem;
+  left: 3rem;
+}
+
+.interactionLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}

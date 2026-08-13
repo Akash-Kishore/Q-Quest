@@ -1,0 +1,46 @@
+.hudGridContainer {
+  position: absolute;
+  inset: 0;
+  padding: 40px;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 1px;
+  opacity: 0.25;
+}
+
+.hudModule {
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  background: rgba(255, 255, 255, 0.01);
+  transition: all 0.5s ease;
+  overflow: hidden;
+}
+
+.hudModule::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 0.5px solid rgba(160, 32, 240, 0.05);
+  pointer-events: none;
+}
+
+.large {
+  grid-column: span 2;
+  grid-row: span 2;
+  border: 1px solid rgba(191, 0, 255, 0.2);
+}
+
+.accent {
+  border-color: rgba(255, 20, 147, 0.3);
+}
+
+.hudModuleInner {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-family: var(--font-mono);
+  font-size: 6px;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+}

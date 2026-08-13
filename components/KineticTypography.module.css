@@ -1,0 +1,17 @@
+.container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.letter {
+  font-family: var(--font-hero);
+  font-size: 18vw;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1;
+}

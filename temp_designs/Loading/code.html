@@ -1,0 +1,285 @@
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Q-QUEST TERMINAL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;family=Space+Grotesk:wght@300..700&amp;family=Inter:wght@400;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-error-container": "#ffdad6",
+                        "background": "#131313",
+                        "outline": "#8e9192",
+                        "on-secondary": "#2f3131",
+                        "surface-container-low": "#1b1b1b",
+                        "on-secondary-container": "#b8b8b8",
+                        "on-primary-container": "#636565",
+                        "outline-variant": "#444748",
+                        "on-primary": "#2f3131",
+                        "inverse-on-surface": "#303030",
+                        "on-secondary-fixed-variant": "#464747",
+                        "secondary-fixed": "#e3e2e2",
+                        "surface-dim": "#131313",
+                        "on-surface": "#e2e2e2",
+                        "on-primary-fixed": "#1a1c1c",
+                        "primary-container": "#e2e2e2",
+                        "error-container": "#93000a",
+                        "surface": "#131313",
+                        "inverse-surface": "#e2e2e2",
+                        "secondary-container": "#484949",
+                        "on-surface-variant": "#c4c7c8",
+                        "on-background": "#e2e2e2",
+                        "tertiary-container": "#e2e2e2",
+                        "surface-container": "#1f1f1f",
+                        "on-secondary-fixed": "#1a1c1c",
+                        "primary-fixed": "#e2e2e2",
+                        "error": "#ffb4ab",
+                        "primary": "#ffffff",
+                        "on-primary-fixed-variant": "#454747",
+                        "surface-bright": "#393939",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "secondary-fixed-dim": "#c7c6c6",
+                        "inverse-primary": "#5d5f5f",
+                        "on-tertiary-container": "#636465",
+                        "on-tertiary": "#2f3131",
+                        "surface-container-highest": "#353535",
+                        "secondary": "#c7c6c6",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary": "#ffffff",
+                        "tertiary-fixed": "#e2e2e2",
+                        "surface-tint": "#c6c6c7",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "surface-container-lowest": "#0e0e0e",
+                        "surface-variant": "#353535",
+                        "on-error": "#690005"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+        }
+
+        .celestial-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background-image: radial-gradient(circle, white 1px, transparent 1px);
+            background-size: 80px 80px;
+            opacity: 0.4;
+        }
+
+        .terminal-bracket {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+        }
+
+        .corner-square {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Process List Carousel Logic */
+        #process-list-container {
+            height: 240px; /* 5 rows of 48px */
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+
+        #highlight-bar {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 48px;
+            background-color: white;
+            z-index: 1;
+        }
+
+        #process-scroller {
+            position: absolute;
+            width: 100%;
+            top: 50%;
+            transform: translateY(0);
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            z-index: 2;
+        }
+
+        .process-line {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+            padding-right: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            transition: color 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .process-line.active {
+            color: #5a189a; /* Inverted color when in highlight bar */
+            font-weight: 700;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .animate-pulse-custom {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/20 via-[#9d4edd] to-[#5a189a] relative flex flex-col justify-center items-center w-screen h-screen overflow-hidden">
+<!-- CELESTIAL BACKGROUND LAYER -->
+<div class="celestial-overlay"></div>
+<!-- CORNER BRACKETS & SQUARES -->
+<!-- Top Left -->
+<div class="terminal-bracket border-t border-l top-[40px] left-[40px] border-white opacity-30"></div>
+<div class="corner-square top-[46px] left-[46px]"></div>
+<!-- Top Right -->
+<div class="terminal-bracket border-t border-r top-[40px] right-[40px] border-white opacity-30"></div>
+<div class="corner-square top-[46px] right-[46px]"></div>
+<!-- Bottom Left -->
+<div class="terminal-bracket border-b border-l bottom-[40px] left-[40px] border-white opacity-30"></div>
+<div class="corner-square bottom-[46px] left-[46px]"></div>
+<!-- Bottom Right -->
+<div class="terminal-bracket border-b border-r bottom-[40px] right-[40px] border-white opacity-30"></div>
+<div class="corner-square bottom-[46px] right-[46px]"></div>
+<!-- MAIN TERMINAL LAYOUT -->
+<main class="grid grid-cols-3 w-full max-w-screen-2xl items-center px-16 z-10 gap-16">
+<!-- LEFT: PROCESS LIST (ROLLING TICKER) -->
+<div class="flex flex-col text-base tracking-widest text-left" id="process-list-container">
+<div id="highlight-bar"></div>
+<div id="process-scroller">
+<div class="process-line">// INITIALIZING Q-QUEST CORE...</div>
+<div class="process-line">// CALIBRATING RESONATORS...</div>
+<div class="process-line">// DECRYPTING AGENT STREAMS...</div>
+<div class="process-line">// SYNCHRONIZING QUBITS...</div>
+<div class="process-line">// UNLOCKING DIMENSIONS...</div>
+<div class="process-line">// SCANNING ARCHITECTURE...</div>
+<div class="process-line">// VALIDATING ANCHORS...</div>
+<div class="process-line">// OPTIMIZING CAPACITANCE...</div>
+<div class="process-line">// SECURING UPLINK...</div>
+<div class="process-line">// PURGING REGISTRIES...</div>
+</div>
+</div>
+<!-- CENTER: STATUS -->
+<div class="flex justify-center">
+<div class="text-white text-3xl tracking-[0.6em] font-bold animate-pulse-custom whitespace-nowrap" id="loading-status" style="font-family: 'JetBrains Mono', monospace;">
+                ( LOADING )
+            </div>
+</div>
+<!-- RIGHT: TELEMETRY -->
+<div class="text-right flex flex-col items-end gap-8">
+<p class="text-white text-[14px] leading-relaxed max-w-[340px] opacity-80 font-mono">
+                // HANG TIGHT, EXPLORER. THE DATA TRANSFER IS IN PROGRESS. CALIBRATING REINFORCEMENT LEARNING AGENTS FOR OPTIMAL RESONANCE.
+            </p>
+<div class="h-[1px] w-full bg-white/20"></div>
+<div class="grid grid-cols-2 gap-x-8 gap-y-4 w-full text-[13px] text-white/60">
+<div class="flex flex-col">
+<span class="text-white/40">LATENCY</span>
+<span class="text-white" id="telemetry-latency">0.002ms</span>
+</div>
+<div class="flex flex-col">
+<span class="text-white/40">BUFFER</span>
+<span class="text-white">OPTIMIZED</span>
+</div>
+<div class="flex flex-col">
+<span class="text-white/40">UPLINK</span>
+<span class="text-white">SECURE</span>
+</div>
+<div class="flex flex-col">
+<span class="text-white/40">COORD</span>
+<span class="text-white" id="telemetry-coord">40.7128 N</span>
+</div>
+</div>
+</div>
+</main>
+<script>
+        (function() {
+            const scroller = document.getElementById('process-scroller');
+            const lines = document.querySelectorAll('.process-line');
+            const status = document.getElementById('loading-status');
+            const lineHeight = 48;
+            let activeIndex = 0;
+
+            function updateDisplay() {
+                const offset = - (activeIndex * lineHeight) - (lineHeight / 2);
+                scroller.style.transform = `translateY(${offset}px)`;
+
+                lines.forEach((line, index) => {
+                    if (index === activeIndex) {
+                        line.classList.add('active');
+                    } else {
+                        line.classList.remove('active');
+                    }
+                });
+            }
+
+            updateDisplay();
+
+            const interval = setInterval(() => {
+                activeIndex++;
+
+                if (activeIndex < lines.length) {
+                    updateDisplay();
+                } else {
+                    clearInterval(interval);
+                    if (status) {
+                        status.textContent = '( DONE )';
+                        status.classList.remove('animate-pulse-custom');
+                    }
+                    activeIndex = lines.length - 1;
+                    updateDisplay();
+                }
+            }, 600);
+        })();
+    </script>
+<script>
+        (function() {
+            const latencyEl = document.getElementById('telemetry-latency');
+            const coordEl = document.getElementById('telemetry-coord');
+
+            function updateTelemetry() {
+                const randomLatency = (Math.random() * (0.009 - 0.001) + 0.001).toFixed(3);
+                if (latencyEl) latencyEl.textContent = `${randomLatency}MS`;
+
+                const baseCoord = 40.7128;
+                const fluctuation = (Math.random() - 0.5) * 0.001;
+                const newCoord = (baseCoord + fluctuation).toFixed(4);
+                if (coordEl) coordEl.textContent = `${newCoord} N`;
+            }
+
+            setInterval(updateTelemetry, 200);
+        })();
+    </script>
+</body></html>
