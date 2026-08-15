@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import * as THREE from 'three';
+import { motion } from 'framer-motion';
 
 export default function TitlePage() {
   const router = useRouter();
@@ -401,20 +402,37 @@ export default function TitlePage() {
         ::-webkit-scrollbar { display: none; }
       `}} />
       <div onClick={() => router.push('/selection')} className="w-full h-full cursor-pointer">
+        {/* Static Background Elements */}
         <div className="space-void"></div>
         <div className="star-field"></div>
         <div className="nebula"></div>
         <div className="vignette"></div>
-        {/* Content to be refracted */}
-        <div id="content-to-refract">
+        
+        {/* Fading Content */}
+        <motion.div 
+            initial={{ opacity: 0, filter: 'blur(10px)' }}
+            animate={{ opacity: 1, filter: 'blur(0px)' }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+            id="content-to-refract">
           <div className="hud-grid-container" id="hud-grid-container"></div>
           <div className="hero-title-container">
             <span className="hero-letter">Q</span><span className="hero-letter">_</span><span className="hero-letter">Q</span><span className="hero-letter">U</span><span className="hero-letter">E</span><span className="hero-letter">S</span><span className="hero-letter">T</span>
           </div>
-        </div>
+        </motion.div>
+
         {/* 3D Layer */}
-        <div id="canvas-container" ref={containerRef}></div>
-        <div className="scene">
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.5, ease: 'easeOut', delay: 0.4 }}
+            id="canvas-container" ref={containerRef}>
+        </motion.div>
+
+        <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut', delay: 0.6 }}
+            className="scene">
           {/* Technical Overlays */}
           <div className="fixed top-8 left-12 font-mono text-[10px] text-white/40 tracking-[0.4em] pointer-events-none z-30">
             MODULAR_SPACE_GRID // GRAPH_HUD_V2
@@ -425,12 +443,11 @@ export default function TitlePage() {
           <div className="fixed bottom-8 left-12 font-mono text-[10px] text-white/40 tracking-[0.4em] pointer-events-none z-30">
             DEEP_SPACE_PULSE: 0xFF
           </div>
-          {/* UI Controls Bottom Right */}
           {/* Interaction Layer for Cursor */}
           <div className="fixed inset-0 z-50 pointer-events-none" id="interaction-layer">
             <div className="w-5 h-5 bg-white/30 rounded-full fixed top-0 left-0 pointer-events-none transition-transform duration-75 ease-out z-[1000]" id="cursor"></div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </>
   );

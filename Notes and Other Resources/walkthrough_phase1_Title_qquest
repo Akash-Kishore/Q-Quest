@@ -1,0 +1,18 @@
+# Q-Quest Phase 1 - Next.js Setup Walkthrough
+
+The project has been successfully migrated to a Next.js App Router application! We've removed the Vite boilerplate and implemented the "Celestial Void" design system based on your Stitch project design document.
+
+## Changes Made
+- **Next.js App Router:** Initialized a new Next.js project with `page.tsx` and `layout.tsx` at the root.
+- **Global Styles:** Replaced TailwindCSS with Vanilla CSS modules and variables in `globals.css` according to your specific request.
+- **Typography:** Set up global fonts (`Space Grotesk`, `Inter`, `JetBrains Mono`, `Epilogue`) using `next/font/google`.
+- **Three.js Integration:** Implemented the `<ThreeCanvas />` React component containing the interactive nucleus and electron paths. 
+- **Kinetic Typography:** Recreated the "Q_QUEST" title text using `framer-motion` for spring-based entrance animations on the text.
+- **Modular HUD:** Built the `<HudGrid />` interface with grid templates and a randomly pulsating "Technical HUD" activity effect.
+
+## Validation Results
+- The application successfully compiles using `npm run build` without any TypeScript or build errors.
+- The 3D scene responds properly to mouse movements with slight parallax effects applied to the HUD grid as well.
+
+> [!TIP]
+> You can now run `npm run dev` to start the local development server and preview the updated kinetic "Celestial Void" application on `http://localhost:3000`!

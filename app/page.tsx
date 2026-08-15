@@ -1,10 +1,18 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LandingPage() {
   const router = useRouter();
+  const [isExiting, setIsExiting] = useState(false);
+
+  const handleEnter = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.push('/loading');
+    }, 800);
+  };
 
   useEffect(() => {
     const starLayer = document.getElementById('parallax-star');
@@ -214,7 +222,14 @@ export default function LandingPage() {
             z-index: 40;
         }
       `}} />
-      <div className="font-body text-on-surface select-none">
+      <div 
+        className="font-body text-on-surface select-none"
+        style={{
+          transition: 'opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1)',
+          opacity: isExiting ? 0 : 1,
+          pointerEvents: isExiting ? 'none' : 'auto'
+        }}
+      >
         {/* Parallax Background Elements */}
         <div className="parallax-layer starfield" id="parallax-star"></div>
         <div className="parallax-layer background-grid" id="parallax-grid"></div>
@@ -250,7 +265,7 @@ export default function LandingPage() {
                 </svg>
               </div>
             </div>
-            <div className="hub-trigger group" onClick={() => router.push('/loading')}>
+            <div className="hub-trigger group" onClick={handleEnter}>
               <div className="absolute inset-0 border-4 border-white/10 rounded-full scale-110 group-hover:scale-125 transition-transform duration-700"></div>
               <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-500 font-headline font-black tracking-tight text-black text-center text-[calc(var(--size-lg)_+_4px)] leading-none">ENTER<br/>The Void</span>
             </div>

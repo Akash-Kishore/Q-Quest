@@ -1,73 +1,56 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+
+const PROCESS_LINES = [
+  "// INITIALIZING Q-QUEST CORE...",
+  "// CALIBRATING RESONATORS...",
+  "// DECRYPTING AGENT STREAMS...",
+  "// SYNCHRONIZING QUBITS...",
+  "// UNLOCKING DIMENSIONS...",
+  "// SCANNING ARCHITECTURE...",
+  "// VALIDATING ANCHORS...",
+  "// OPTIMIZING CAPACITANCE...",
+  "// SECURING UPLINK...",
+  "// PURGING REGISTRIES..."
+];
 
 export default function LoadingPage() {
   const router = useRouter();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isDone, setIsDone] = useState(false);
+  const [latency, setLatency] = useState("0.002");
+  const [coord, setCoord] = useState("40.7128");
 
   useEffect(() => {
-    const scroller = document.getElementById('process-scroller');
-    const lines = document.querySelectorAll('.process-line');
-    const status = document.getElementById('loading-status');
-    const lineHeight = 48;
-    let activeIndex = 0;
-
-    function updateDisplay() {
-        const offset = - (activeIndex * lineHeight) - (lineHeight / 2);
-        if (scroller) scroller.style.transform = `translateY(${offset}px)`;
-
-        lines.forEach((line, index) => {
-            if (index === activeIndex) {
-                line.classList.add('active');
-            } else {
-                line.classList.remove('active');
-            }
-        });
-    }
-
-    updateDisplay();
-
     const interval = setInterval(() => {
-        activeIndex++;
-
-        if (activeIndex < lines.length) {
-            updateDisplay();
+      setActiveIndex(prev => {
+        if (prev < PROCESS_LINES.length - 1) {
+          return prev + 1;
         } else {
-            clearInterval(interval);
-            if (status) {
-                status.textContent = '( DONE )';
-                status.classList.remove('animate-pulse-custom');
-            }
-            activeIndex = lines.length - 1;
-            updateDisplay();
-            // Automatically route to /home after finishing
-            setTimeout(() => {
-                router.push('/home');
-            }, 800);
+          clearInterval(interval);
+          setIsDone(true);
+          setTimeout(() => {
+             router.push('/home');
+          }, 800);
+          return prev;
         }
+      });
     }, 600);
-
-    const latencyEl = document.getElementById('telemetry-latency');
-    const coordEl = document.getElementById('telemetry-coord');
-
-    function updateTelemetry() {
-        const randomLatency = (Math.random() * (0.009 - 0.001) + 0.001).toFixed(3);
-        if (latencyEl) latencyEl.textContent = `${randomLatency}MS`;
-
-        const baseCoord = 40.7128;
-        const fluctuation = (Math.random() - 0.5) * 0.001;
-        const newCoord = (baseCoord + fluctuation).toFixed(4);
-        if (coordEl) coordEl.textContent = `${newCoord} N`;
-    }
-
-    const telemetryInterval = setInterval(updateTelemetry, 200);
-
-    return () => {
-        clearInterval(interval);
-        clearInterval(telemetryInterval);
-    };
+    return () => clearInterval(interval);
   }, [router]);
+
+  useEffect(() => {
+    const telemetryInterval = setInterval(() => {
+      setLatency((Math.random() * (0.009 - 0.001) + 0.001).toFixed(3));
+      setCoord((40.7128 + (Math.random() - 0.5) * 0.001).toFixed(4));
+    }, 200);
+    return () => clearInterval(telemetryInterval);
+  }, []);
+
+  const lineHeight = 48;
+  const offset = - (activeIndex * lineHeight) - (lineHeight / 2);
 
   return (
     <>
@@ -77,6 +60,34 @@ export default function LoadingPage() {
             padding: 0;
             font-family: 'JetBrains Mono', monospace;
             text-transform: uppercase;
+        }
+
+        .terminal-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-image: radial-gradient(ellipse at top right, rgba(255,255,255,0.2), #9d4edd, #5a189a);
+        }
+
+        .content-wrapper {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+            opacity: 1;
+        }
+
+        .content-wrapper.fade-out {
+            opacity: 0;
+            pointer-events: none;
         }
 
         .celestial-overlay {
@@ -95,7 +106,13 @@ export default function LoadingPage() {
             position: absolute;
             width: 24px;
             height: 24px;
+            opacity: 0.3;
         }
+        
+        .bracket-tl { border-top: 1px solid white; border-left: 1px solid white; top: 40px; left: 40px; }
+        .bracket-tr { border-top: 1px solid white; border-right: 1px solid white; top: 40px; right: 40px; }
+        .bracket-bl { border-bottom: 1px solid white; border-left: 1px solid white; bottom: 40px; left: 40px; }
+        .bracket-br { border-bottom: 1px solid white; border-right: 1px solid white; bottom: 40px; right: 40px; }
 
         .corner-square {
             position: absolute;
@@ -103,14 +120,39 @@ export default function LoadingPage() {
             height: 12px;
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
+        
+        .square-tl { top: 46px; left: 46px; }
+        .square-tr { top: 46px; right: 46px; }
+        .square-bl { bottom: 46px; left: 46px; }
+        .square-br { bottom: 46px; right: 46px; }
 
-        /* Process List Carousel Logic */
+        .main-layout {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            width: 100%;
+            max-width: 1536px;
+            align-items: center;
+            padding-left: 64px;
+            padding-right: 64px;
+            z-index: 10;
+            gap: 64px;
+            animation: fadeIn 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
         #process-list-container {
-            height: 240px; /* 5 rows of 48px */
+            height: 240px;
             position: relative;
             overflow: hidden;
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            text-align: left;
+            font-size: 16px;
+            letter-spacing: 0.1em;
         }
 
         #highlight-bar {
@@ -128,7 +170,6 @@ export default function LoadingPage() {
             position: absolute;
             width: 100%;
             top: 50%;
-            transform: translateY(0);
             transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
@@ -147,8 +188,69 @@ export default function LoadingPage() {
         }
 
         .process-line.active {
-            color: #5a189a; /* Inverted color when in highlight bar */
+            color: #5a189a;
             font-weight: 700;
+        }
+
+        .status-container {
+            display: flex;
+            justify-content: center;
+        }
+
+        #loading-status {
+            color: white;
+            font-size: 30px;
+            line-height: 36px;
+            letter-spacing: 0.6em;
+            font-weight: 700;
+            white-space: nowrap;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .telemetry-section {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 32px;
+        }
+
+        .telemetry-p {
+            color: white;
+            font-size: 14px;
+            line-height: 1.625;
+            max-width: 340px;
+            opacity: 0.8;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .telemetry-divider {
+            height: 1px;
+            width: 100%;
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 32px;
+            row-gap: 16px;
+            width: 100%;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .telemetry-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .telemetry-label {
+            color: rgba(255,255,255,0.4);
+        }
+
+        .telemetry-value {
+            color: white;
         }
 
         @keyframes pulse {
@@ -161,77 +263,77 @@ export default function LoadingPage() {
         }
       `}} />
 
-      <div className="bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/20 via-[#9d4edd] to-[#5a189a] relative flex flex-col justify-center items-center w-screen h-screen overflow-hidden">
-        {/* CELESTIAL BACKGROUND LAYER */}
-        <div className="celestial-overlay"></div>
-        
-        {/* CORNER BRACKETS & SQUARES */}
-        {/* Top Left */}
-        <div className="terminal-bracket border-t border-l top-[40px] left-[40px] border-white opacity-30"></div>
-        <div className="corner-square top-[46px] left-[46px]"></div>
-        {/* Top Right */}
-        <div className="terminal-bracket border-t border-r top-[40px] right-[40px] border-white opacity-30"></div>
-        <div className="corner-square top-[46px] right-[46px]"></div>
-        {/* Bottom Left */}
-        <div className="terminal-bracket border-b border-l bottom-[40px] left-[40px] border-white opacity-30"></div>
-        <div className="corner-square bottom-[46px] left-[46px]"></div>
-        {/* Bottom Right */}
-        <div className="terminal-bracket border-b border-r bottom-[40px] right-[40px] border-white opacity-30"></div>
-        <div className="corner-square bottom-[46px] right-[46px]"></div>
-        
-        {/* MAIN TERMINAL LAYOUT */}
-        <main className="grid grid-cols-3 w-full max-w-screen-2xl items-center px-16 z-10 gap-16">
-          {/* LEFT: PROCESS LIST (ROLLING TICKER) */}
-          <div className="flex flex-col text-base tracking-widest text-left" id="process-list-container">
-            <div id="highlight-bar"></div>
-            <div id="process-scroller">
-              <div className="process-line">// INITIALIZING Q-QUEST CORE...</div>
-              <div className="process-line">// CALIBRATING RESONATORS...</div>
-              <div className="process-line">// DECRYPTING AGENT STREAMS...</div>
-              <div className="process-line">// SYNCHRONIZING QUBITS...</div>
-              <div className="process-line">// UNLOCKING DIMENSIONS...</div>
-              <div className="process-line">// SCANNING ARCHITECTURE...</div>
-              <div className="process-line">// VALIDATING ANCHORS...</div>
-              <div className="process-line">// OPTIMIZING CAPACITANCE...</div>
-              <div className="process-line">// SECURING UPLINK...</div>
-              <div className="process-line">// PURGING REGISTRIES...</div>
-            </div>
-          </div>
+      <div className="terminal-container">
+        <div className={`content-wrapper ${isDone ? 'fade-out' : ''}`}>
+          {/* CELESTIAL BACKGROUND LAYER */}
+          <div className="celestial-overlay"></div>
           
-          {/* CENTER: STATUS */}
-          <div className="flex justify-center">
-            <div className="text-white text-3xl tracking-[0.6em] font-bold animate-pulse-custom whitespace-nowrap" id="loading-status" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                ( LOADING )
-            </div>
-          </div>
+          {/* CORNER BRACKETS & SQUARES */}
+          <div className="terminal-bracket bracket-tl"></div>
+          <div className="corner-square square-tl"></div>
           
-          {/* RIGHT: TELEMETRY */}
-          <div className="text-right flex flex-col items-end gap-8">
-            <p className="text-white text-[14px] leading-relaxed max-w-[340px] opacity-80 font-mono">
-                // HANG TIGHT, EXPLORER. THE DATA TRANSFER IS IN PROGRESS. CALIBRATING REINFORCEMENT LEARNING AGENTS FOR OPTIMAL RESONANCE.
-            </p>
-            <div className="h-[1px] w-full bg-white/20"></div>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4 w-full text-[13px] text-white/60">
-              <div className="flex flex-col">
-                <span className="text-white/40">LATENCY</span>
-                <span className="text-white" id="telemetry-latency">0.002ms</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white/40">BUFFER</span>
-                <span className="text-white">OPTIMIZED</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white/40">UPLINK</span>
-                <span className="text-white">SECURE</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white/40">COORD</span>
-                <span className="text-white" id="telemetry-coord">40.7128 N</span>
+          <div className="terminal-bracket bracket-tr"></div>
+          <div className="corner-square square-tr"></div>
+          
+          <div className="terminal-bracket bracket-bl"></div>
+          <div className="corner-square square-bl"></div>
+          
+          <div className="terminal-bracket bracket-br"></div>
+          <div className="corner-square square-br"></div>
+          
+          {/* MAIN TERMINAL LAYOUT */}
+          <main className="main-layout">
+            {/* LEFT: PROCESS LIST (ROLLING TICKER) */}
+            <div id="process-list-container">
+              <div id="highlight-bar"></div>
+              <div id="process-scroller" style={{ transform: `translateY(${offset}px)` }}>
+                {PROCESS_LINES.map((line, idx) => (
+                  <div key={idx} className={`process-line ${idx === activeIndex ? 'active' : ''}`}>
+                    {line}
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        </main>
+            
+            {/* CENTER: STATUS */}
+            <div className="status-container">
+              <div 
+                  id="loading-status" 
+                  className={isDone ? '' : 'animate-pulse-custom'}
+              >
+                  {isDone ? '( DONE )' : '( LOADING )'}
+              </div>
+            </div>
+            
+            {/* RIGHT: TELEMETRY */}
+            <div className="telemetry-section">
+              <p className="telemetry-p">
+                  // HANG TIGHT, EXPLORER. THE DATA TRANSFER IS IN PROGRESS. CALIBRATING REINFORCEMENT LEARNING AGENTS FOR OPTIMAL RESONANCE.
+              </p>
+              <div className="telemetry-divider"></div>
+              <div className="telemetry-grid">
+                <div className="telemetry-item">
+                  <span className="telemetry-label">LATENCY</span>
+                  <span className="telemetry-value" id="telemetry-latency">{latency}MS</span>
+                </div>
+                <div className="telemetry-item">
+                  <span className="telemetry-label">BUFFER</span>
+                  <span className="telemetry-value">OPTIMIZED</span>
+                </div>
+                <div className="telemetry-item">
+                  <span className="telemetry-label">UPLINK</span>
+                  <span className="telemetry-value">SECURE</span>
+                </div>
+                <div className="telemetry-item">
+                  <span className="telemetry-label">COORD</span>
+                  <span className="telemetry-value" id="telemetry-coord">{coord} N</span>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     </>
   );
 }
+
