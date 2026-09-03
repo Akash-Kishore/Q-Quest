@@ -69,7 +69,9 @@ function useCardTilt(maxAngle: number = 5) {
 }
 
 // ---------------------------------------------------------------------------
-// SelectionReveal — Oversized Launch Pad title → scale-down → cards
+// SelectionReveal — Launch Pad emerges behind the dissolving pixel field.
+// Cinematic oversized title settles to a responsive heading (never clips),
+// then label / subtitle / cards reveal in sequence. No premature cards.
 // ---------------------------------------------------------------------------
 export default function SelectionReveal() {
   const { subscribe, reducedMotion } = useHomeScroll();
@@ -83,75 +85,103 @@ export default function SelectionReveal() {
   const card2WrapRef = useRef<HTMLDivElement>(null);
   const interactiveRef = useRef(false);
 
+  // Max cinematic scale for the title, measured from actual text bounds vs the
+  // safe viewport region so the oversized initial state can never clip.
+  const titleMaxScale = useRef(1);
+
   const card1Tilt = useCardTilt(5);
   const card2Tilt = useCardTilt(5);
 
   useEffect(() => {
+    const measureTitleScale = () => {
+      const el = titleRef.current;
+      if (!el) return;
+      const prev = el.style.transform;
+      el.style.transform = 'none';
+      const rect = el.getBoundingClientRect();
+      el.style.transform = prev;
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const safeW = window.innerWidth * 0.9;
+      const safeH = window.innerHeight * 0.6;
+      const s = Math.min(safeW / rect.width, safeH / rect.height, 3.0);
+      titleMaxScale.current = Math.max(1, s);
+    };
+
+    measureTitleScale();
+    // Re-measure once webfonts have loaded (affects text width).
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(measureTitleScale).catch(() => {});
+    }
+    window.addEventListener('resize', measureTitleScale);
+
     if (reducedMotion) {
-      // Show everything in final state
-      if (layerRef.current) layerRef.current.style.pointerEvents = 'auto';
-      return;
+      // Final, readable state — cards accessible, no transition trap.
+      if (titleRef.current) {
+        titleRef.current.style.transform = 'none';
+        titleRef.current.style.opacity = '1';
+      }
+      [labelRef, subtitleRef, card1WrapRef, card2WrapRef].forEach((r) => {
+        if (r.current) {
+          r.current.style.clipPath = 'inset(0 0 0% 0)';
+          r.current.style.transform = 'none';
+          (r.current as HTMLElement).style.pointerEvents = 'auto';
+        }
+      });
+      if (layerRef.current) {
+        layerRef.current.style.visibility = 'visible';
+        layerRef.current.style.pointerEvents = 'auto';
+      }
+      return () => window.removeEventListener('resize', measureTitleScale);
     }
 
-    const unsub = subscribe((progress: number) => {
-      // Map to internal progress (0.66→1.0 scroll range)
-      const ip = Math.max(0, Math.min(1, (progress - 0.66) / 0.34));
-
-      // Layer visibility — appears when sphere formation starts locking
+    const unsub = subscribe((g: number) => {
+      // Layer becomes visible as the pixel field starts thinning
       if (layerRef.current) {
-        layerRef.current.style.visibility = ip > 0.65 ? 'visible' : 'hidden';
+        layerRef.current.style.visibility = g > 0.70 ? 'visible' : 'hidden';
       }
 
-      // --- Title: clip-path + translateY at 0.72–0.80 (internal) ---
+      // --- Title: oversized cinematic settle (scale + rise + fade), 0.74–0.865 ---
       if (titleRef.current) {
-        const t = easeOutCubic(rangeProgress(ip, 0.72, 0.80));
-        const titleY = lerp(40, 0, t);
-        const titleClip = lerp(100, 0, t);
-        titleRef.current.style.transform = `translateY(${titleY}px)`;
-        titleRef.current.style.clipPath = `inset(0 0 ${titleClip}% 0)`;
+        const t = easeOutCubic(rangeProgress(g, 0.74, 0.865));
+        const scale = lerp(titleMaxScale.current, 1, t);
+        const y = lerp(34, 0, t);
+        titleRef.current.style.transform = `translateY(${y}px) scale(${scale})`;
+        titleRef.current.style.opacity = String(Math.min(1, t * 1.4));
       }
 
-      // --- System label: 0.78–0.84 ---
+      // --- System label: 0.84–0.91 ---
       if (labelRef.current) {
-        const t = easeOutCubic(rangeProgress(ip, 0.78, 0.84));
-        const labelY = lerp(30, 0, t);
-        const labelClip = lerp(100, 0, t);
-        labelRef.current.style.transform = `translateY(${labelY}px)`;
-        labelRef.current.style.clipPath = `inset(0 0 ${labelClip}% 0)`;
+        const t = easeOutCubic(rangeProgress(g, 0.84, 0.91));
+        labelRef.current.style.transform = `translateY(${lerp(28, 0, t)}px)`;
+        labelRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
       }
 
-      // --- Subtitle: 0.80–0.86 ---
+      // --- Subtitle: 0.86–0.93 ---
       if (subtitleRef.current) {
-        const t = easeOutCubic(rangeProgress(ip, 0.80, 0.86));
-        const subY = lerp(25, 0, t);
-        const subClip = lerp(100, 0, t);
-        subtitleRef.current.style.transform = `translateY(${subY}px)`;
-        subtitleRef.current.style.clipPath = `inset(0 0 ${subClip}% 0)`;
+        const t = easeOutCubic(rangeProgress(g, 0.86, 0.93));
+        subtitleRef.current.style.transform = `translateY(${lerp(24, 0, t)}px)`;
+        subtitleRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
       }
 
-      // --- Card 1: 0.88–0.94 ---
+      // --- Card 1: 0.88–0.955 ---
       if (card1WrapRef.current) {
-        const t = easeOutCubic(rangeProgress(ip, 0.88, 0.94));
-        const c1Y = lerp(50, 0, t);
-        const c1Clip = lerp(100, 0, t);
-        card1WrapRef.current.style.transform = `translateY(${c1Y}px)`;
-        card1WrapRef.current.style.clipPath = `inset(0 0 ${c1Clip}% 0)`;
+        const t = easeOutCubic(rangeProgress(g, 0.88, 0.955));
+        card1WrapRef.current.style.transform = `translateY(${lerp(50, 0, t)}px)`;
+        card1WrapRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
         card1WrapRef.current.style.pointerEvents = t > 0.8 ? 'auto' : 'none';
       }
 
-      // --- Card 2: 0.90–0.96 ---
+      // --- Card 2: 0.905–0.97 ---
       if (card2WrapRef.current) {
-        const t = easeOutCubic(rangeProgress(ip, 0.90, 0.96));
-        const c2Y = lerp(50, 0, t);
-        const c2Clip = lerp(100, 0, t);
-        card2WrapRef.current.style.transform = `translateY(${c2Y}px)`;
-        card2WrapRef.current.style.clipPath = `inset(0 0 ${c2Clip}% 0)`;
+        const t = easeOutCubic(rangeProgress(g, 0.905, 0.97));
+        card2WrapRef.current.style.transform = `translateY(${lerp(50, 0, t)}px)`;
+        card2WrapRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
         card2WrapRef.current.style.pointerEvents = t > 0.8 ? 'auto' : 'none';
       }
 
-      // Enable layer interaction at the end
+      // Enable layer interaction once settled
       if (layerRef.current) {
-        const shouldBeInteractive = ip > 0.96;
+        const shouldBeInteractive = g > 0.965;
         if (shouldBeInteractive !== interactiveRef.current) {
           interactiveRef.current = shouldBeInteractive;
           layerRef.current.style.pointerEvents = shouldBeInteractive ? 'auto' : 'none';
@@ -159,7 +189,10 @@ export default function SelectionReveal() {
       }
     });
 
-    return unsub;
+    return () => {
+      unsub();
+      window.removeEventListener('resize', measureTitleScale);
+    };
   }, [subscribe, reducedMotion]);
 
   return (
@@ -169,6 +202,15 @@ export default function SelectionReveal() {
       style={{ visibility: 'hidden', pointerEvents: 'none' }}
     >
       <div className={styles.selectionContent}>
+        {/* Main heading — oversized cinematic settle, revealed behind the pixel curtain */}
+        <h2
+          ref={titleRef}
+          className={styles.selectionTitle}
+          style={{ opacity: 0 }}
+        >
+          Launch Pad
+        </h2>
+
         {/* System label */}
         <span
           ref={labelRef}
@@ -177,15 +219,6 @@ export default function SelectionReveal() {
         >
           System-01 // Laboratory
         </span>
-
-        {/* Main heading — oversized, always opacity 1, revealed by pixel curtain */}
-        <h2
-          ref={titleRef}
-          className={styles.selectionTitle}
-          style={{ clipPath: 'inset(0 0 100% 0)' }}
-        >
-          Launch Pad
-        </h2>
 
         {/* Subtitle */}
         <p

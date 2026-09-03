@@ -308,9 +308,13 @@
   color: #2d1b36;
   letter-spacing: -0.05em;
   line-height: 1;
-  margin-bottom: 1.5rem;
-  font-size: clamp(2.5rem, 7vw, 5.5rem);
-  will-change: transform, clip-path;
+  margin: 0 auto 1.5rem;
+  font-size: clamp(2rem, 7vw, 5.5rem);
+  width: fit-content;
+  max-width: 100%;
+  white-space: nowrap;
+  transform-origin: center center;
+  will-change: transform, opacity;
 }
 
 
@@ -440,18 +444,21 @@
 }
 
 @media (max-width: 640px) {
-  .card { height: clamp(280px, 50vh, 360px); padding: 1.25rem; }
+  /* Launch Pad must fit within the pinned 100vh stage when the cards stack
+     vertically — tighter card heights + vertical rhythm so nothing clips. */
+  .card { height: clamp(220px, 34vh, 280px); padding: 1.25rem; }
   .cardTitle { font-size: 1.5rem; }
   .scrollTrack { height: 350vh; }
   .heroLetters { font-size: clamp(3rem, 14vw, 5rem); }
   .selectionTitle { font-size: clamp(2rem, 10vw, 3.5rem); }
-  .selectionSubtitle { font-size: clamp(0.875rem, 3.5vw, 1.1rem); }
+  .selectionSubtitle { font-size: clamp(0.875rem, 3.5vw, 1.1rem); margin-bottom: 1.5rem; }
+  .selectionSystemLabel { margin-bottom: 1rem; }
 }
 
 @media (max-width: 480px) {
   .selectionContent { padding: 0.75rem; }
   .selectionCardsGrid { gap: 1.25rem; }
-  .card { height: clamp(260px, 45vh, 320px); padding: 1rem; }
+  .card { height: clamp(200px, 30vh, 260px); padding: 1rem; }
   .cardTitle { font-size: 1.25rem; }
   .cardBadge { font-size: 0.625rem; padding: 0.2rem 0.5rem; }
 }
