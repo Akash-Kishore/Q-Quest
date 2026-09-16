@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# graphify / obsidian-rag derived data.
+# vault/notes/ is deliberately NOT ignored: those are hand-written decisions
+# worth versioning alongside the code that prompted them.
+graphify-out/
+vault/_graph/
+vault/.rag/

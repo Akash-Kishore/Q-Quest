@@ -1,0 +1,615 @@
+# `/home` Cinematic Scroll Experience — Final Implementation Plan
+
+---
+
+## 0. Visual Truth Principle
+
+> **The browser-rendered result is the final authority.**
+
+All numerical values in this plan — percentages, scale multipliers, camera Z positions, FOV values, particle counts, timings, opacity values, easing durations — are **implementation starting points**, not final specifications.
+
+The final values must be tuned from the actual Chrome-rendered result. For every major visual target, the acceptance criterion is defined visually:
+
+| Target | Starting Value | Visual Acceptance Criterion |
+|--------|---------------|---------------------------|
+| Q_QUEST size | `clamp(4.5rem, 13vw, 10rem)` | Title anchors the opening scene, feels dominant and bold |
+| Sphere at arrival hold | camera Z ≈ 3.3 | Sphere visually occupies ~75–80% of viewport height |
+| Launch Pad initial reveal | `scale(2.5)` | Heading dominates ~70–75% of viewport width while remaining legible |
+| Fragment count (desktop) | 35–55 primary + 10–25 secondary | Breakup reads as "transformation" not "particle effect" |
+| Anticipation hold | progress 0.55–0.68 | Perceptible cinematic beat — viewer registers the sphere's importance |
+
+If a starting value produces a poor visual result, it must be changed. The plan guides implementation; Chrome validates it.
+
+---
+
+## A. Architecture
+
+### Scroll-Track Structure
+The existing **500vh** `scrollTrack` is the scroll runway. `HomeScrollController` pins a viewport-sized `cinematicStage` inside it via GSAP `ScrollTrigger`. As the user scrolls through the 500vh track, `ScrollTrigger.onUpdate` fires a normalized `progress` value (0→1) to all subscribers via a pub-sub context — **no React re-renders**.
+
+### Component Responsibilities & Rendering Layers
+
+| z-index | Component | Role |
+|---------|-----------|------|
+| 0–5 | `EnvironmentLayers` | Background atmosphere: void, stars, nebula, vignette, aurora, paper grain. Pure DOM + inline style mutation. |
+| 6 | `HudGrid` | 12×8 technical grid with pulse animation. DOM-generated modules. Participates in the camera journey as environmental architecture, then dissolves by progress ~0.70. |
+| 10 | `SphereScene` | Three.js `<canvas>`: dark sphere with Fresnel glow, 3 orbital electrons, multi-axis camera choreography. Pauses rendering at progress >0.74. |
+| 11 | `ParticleField` | 2D `<canvas>`: fracture fragments — two-tier system of primary smoky spheres and secondary atmospheric particles. Active between progress 0.64–0.98. |
+| 15 | `HeroTitle` | `Q_QUEST` CSS typography with smoked-glass material treatment. Spatial exit (translateY), **never fades**. |
+| 20 | `SelectionReveal` | "Launch Pad" cinematic title card → scale-down → subtitle → cards. Clip-path/translation entrance choreography. |
+
+### Lenis Integration
+Lenis provides buttery smooth scroll. Connected to GSAP ticker via `lenis.on('scroll', ScrollTrigger.update)`. Duration 1.4s with exponential easing. Touch multiplier 1.5 for mobile.
+
+### Shared `scrollProgress`
+The `subscribe(fn)` pattern means each component receives `progress` in its own `requestAnimationFrame` or scroll callback without triggering React renders. All animation is imperative DOM/canvas/WebGL mutation.
+
+### State/Lifecycle Strategy
+- Three.js renderer and 2D canvas each manage their own `requestAnimationFrame` loops.
+- Both **pause** (not destroy) when their content is off-stage. Both reactivate on reverse scroll.
+- No React state drives animation — only refs and imperative style writes.
+- Reduced-motion support: all components check `prefers-reduced-motion` and render final state directly.
+
+---
+
+## B. Cinematic Sequence (Progress Timeline)
+
+```
+0.00–0.05  Q_QUEST visible, sphere distant, HUD grid subtle, stars visible
+           ─── the viewer enters a dark quantum world ───
+
+0.05–0.35  Q_QUEST exits upward (spatial, never fades — accelerating translateY)
+           ─── the title physically leaves the viewport ───
+
+0.00–0.68  Camera approaches sphere (Z, Y drift, X lateral drift, FOV compression)
+           ─── the viewer is drawn toward the sphere ───
+
+0.30–0.65  Star field fades naturally (motivated by sphere dominance, not by timer)
+
+0.50–0.70  HUD grid quiets — perspective shift, parallax, then dissolves
+           ─── environmental architecture yields to the sphere ───
+
+0.55–0.68  Anticipation hold — glow intensifies, sphere dominates viewport
+           ─── cinematic beat: the sphere feels enormous, alive, mysterious ───
+
+0.64–0.66  Micro surface instability — subtle vertex displacement begins
+
+0.66–0.68  First fragment event — one or two large fragments visibly detach
+
+0.68–0.72  Progressive fragmentation — more fragments separate from surface
+
+0.72–0.85  Fragment dispersion — passers approach camera, ascenders rise,
+           drifters scatter, settlers begin navigating to target positions
+           ─── the viewer passes through translucent smoky fragments ───
+
+0.72–0.92  Environmental transition — dark → purple → lavender → pastel aurora
+           ─── the world changes around the viewer ───
+
+0.82–0.95  Settlers converge to decorative positions (selection sphere anchors)
+
+0.85–0.88  HUGE "Launch Pad" appears — dominates ~70-75% of viewport
+           ─── second cinematic title card moment ───
+
+0.88–0.90  Brief dominance hold — the giant heading lingers intentionally
+
+0.90–0.93  Camera-like pullback — Launch Pad scales down to final position
+           ─── the full selection world is revealed ───
+
+0.93–0.95  Subtitle reveals (clip-path + translation, never fades)
+
+0.95–0.99  Cards enter with stagger (translation + scale + spring)
+           ─── the destinations appear ───
+
+0.97+      Final interactive state — cards clickable, environment alive
+           ─── a living game-world destination hub ───
+```
+
+### Cinematic Symmetry
+
+```
+OPENING                              ENDING
+
+camera moves TOWARD sphere           Launch Pad begins enormous
+        ↓                                    ↓
+sphere becomes enormous              camera/framing PULLS BACK
+        ↓                                    ↓
+sphere dominates the world           full selection environment revealed
+```
+
+This mirrored structure gives the experience coherent cinematic grammar.
+
+---
+
+## C. Typography — Q_QUEST
+
+### Size Increase (~25%)
+Change from `clamp(3.5rem, 10vw, 8rem)` → `clamp(4.5rem, 13vw, 10rem)`.
+
+**Visual criterion**: The title must anchor the opening scene, feel dominant and bold, and not clip at viewport edges on mobile.
+
+### Smoked-Glass Material System
+
+The material should have inherent visual character — not achieved merely through opacity, drop shadow, or backdrop blur.
+
+**Layered material approach:**
+
+1. **Translucent gradient fill** — Base color: `rgba(200, 200, 220, 0.85)` (slightly cool-tinted, not pure white). Apply a subtle vertical gradient via `background: linear-gradient(...)` + `-webkit-background-clip: text` + `-webkit-text-fill-color: transparent`, transitioning from a slightly brighter top to a slightly darker bottom. This creates luminance variation across glyphs.
+
+2. **Soft internal highlight** — A `text-shadow` at `0 -1px 0 rgba(255,255,255,0.15)` simulates top-light catching the upper surface of each letter.
+
+3. **Restrained lower/edge shadow** — `text-shadow` at `0 2px 6px rgba(0,0,0,0.35)` creates subtle lift and depth against the dark/purple background.
+
+4. **Fresnel-like edge illumination** — `-webkit-text-stroke: 0.5px rgba(255,255,255,0.2)` adds a very subtle bright outline simulating light catching the edge of glass.
+
+5. **Purple ambient glow** — `text-shadow` at `0 0 40px rgba(160,32,240,0.12)` ties the title to the sphere's color vocabulary.
+
+6. **Extremely low-frequency noise/displacement** — A pseudo-element behind the text with a subtle SVG noise filter at near-zero opacity (`0.03–0.05`) creates micro-texture suggesting frosted glass, without visible grain.
+
+### What This Must NOT Look Like
+- ❌ Metallic / chrome
+- ❌ Full 3D extrusion / bevelled
+- ❌ Neon / holographic
+- ❌ Transparent enough to feel weak
+
+### What This MUST Look Like
+- ✅ Smoked glass / frosted quantum material
+- ✅ Bold, dominant, readable
+- ✅ Solid enough to anchor the scene
+- ✅ Subtle translucency — the sphere is faintly visible behind/through
+
+### Spatial Exit (Never Fades)
+The title moves from `translateY(0)` → `translateY(-110vh)` with `easeInCubic` between progress 0.05–0.35. **Opacity remains 1.0 at all times.** The title physically leaves the viewport upward.
+
+---
+
+## D. Sphere / Fragment System
+
+### D1. Sphere Shader
+
+**Vertex shader**: Displaces vertices along normals using a sin/cos noise function modulated by `uFracture` (0→1). Creates visible surface instability before breakup.
+
+**Fragment shader**: Dark core (`#050005`) + Fresnel purple glow (`#a020f0`). Breathing animation via `sin(uTime)`. Alpha fades with fracture progress.
+
+**Refinements:**
+- Increase Fresnel power during anticipation hold. Starting value: 1.0 → 1.8. Visual criterion: the sphere's edge should glow dramatically, creating a sense of contained energy about to release.
+- The surface instability (vertex displacement) should begin subtly at progress ~0.64 (micro-instability), not waiting for 0.66.
+
+### D2. Two-Tier Fragment System
+
+> **Quality of fragments > quantity of fragments.**
+
+#### Primary Fragments (35–55 starting count, desktop)
+Visually important smoky spheres. Each must resemble:
+
+> **A small translucent smoky quantum sphere — a piece of frosted quantum glass.**
+
+Material specification per primary fragment:
+- **Radial volume shading** — Radial gradient from bright center highlight → translucent body → subtle darker edge
+- **Soft center highlight** — offset toward upper-left to simulate directional light
+- **Translucent body** — globalAlpha between 0.4–0.7 (varied per fragment)
+- **Subtle darker crescent** — on the opposite side from the highlight
+- **Soft atmospheric halo** — A second, larger, more diffuse gradient rendered underneath at very low alpha (0.08–0.15), creating a smoky aura
+- **Restrained purple/white energy** — Color interpolates between purple-tinted and white as the environment transitions
+- **Edge illumination** — Slight bright ring at the outermost edge of the radial gradient
+- **Depth shading** — Fragments further from camera: smaller, softer, less saturated. Fragments closer: larger, sharper, more saturated.
+
+#### Secondary Fragments (10–25 starting count, desktop)
+Tiny atmospheric particles that bridge composition gaps. Simpler rendering: single small radial gradient, lower alpha, no halo pass. They add atmosphere without drawing attention.
+
+#### Fragment Count by Viewport
+| Viewport | Primary | Secondary |
+|----------|---------|-----------|
+| Desktop (>1024px) | 35–55 | 10–25 |
+| Tablet (768–1024px) | 25–35 | 8–15 |
+| Mobile (<768px) | 15–25 | 5–10 |
+
+These are starting values. Final counts determined by visual quality in Chrome.
+
+### D3. Fragment Size Distribution
+
+Non-uniform distribution to avoid "same circle duplicated many times":
+
+| Tier | Approx. % of primary | Radius range (starting) |
+|------|---------------------|------------------------|
+| Hero fragments (large) | ~15% | 20–40px |
+| Medium fragments | ~45% | 10–20px |
+| Small fragments | ~30% | 5–12px |
+| Tiny atmospheric | ~10% | 2–6px |
+
+Exact distribution tuned in Chrome. The key criterion: the viewer should perceive varied, organic fragment sizes.
+
+### D4. Fragment Material Variation
+
+Each fragment has subtle visual individuality. Per-fragment randomized properties:
+
+- Radius (from size distribution above)
+- Transparency (alpha range: 0.4–0.7)
+- Glow intensity (shadow blur: 0.3–0.8 × radius)
+- Highlight offset position (angle variation: ±30°)
+- Purple/white balance (hue shift: ±15% from base)
+- Drift speed (per-group base × 0.6–1.4 random multiplier)
+- Internal light brightness (highlight stop alpha: 0.7–1.0)
+
+Variation must remain subtle enough that fragments read as a **coherent material family** — like shattered pieces of the same glass object.
+
+### D5. Staged Fracture Narrative
+
+The fracture is NOT a simultaneous particle burst. It follows a deliberate cinematic sequence:
+
+```
+Progress 0.64–0.66: MICRO INSTABILITY
+  Sphere shader vertex displacement begins at very low amplitude.
+  Surface ripples. The sphere feels "alive" and unstable.
+  No fragments visible yet.
+
+Progress 0.66–0.68: FIRST FRAGMENT EVENT
+  1–3 large (hero-tier) fragments visibly detach from specific sphere
+  surface positions. They drift slowly outward.
+  The remaining sphere surface shows increased instability.
+  The viewer registers: "This object is transforming."
+
+Progress 0.68–0.72: PROGRESSIVE FRAGMENTATION
+  More fragments separate in waves. Medium and small fragments
+  join the hero fragments. The sphere's alpha decreases as
+  fragments emerge. By 0.72, the sphere shader is nearly invisible.
+
+Progress 0.72–0.85: DISPERSION
+  All fragments are free. Group-specific motion takes over
+  (passers, ascenders, drifters, settlers).
+```
+
+**Implementation detail for the first-fragment event:** The first 3 particles in the array are designated as "first fragments." They begin their birth animation at progress 0.66 while all others wait until 0.68+. Their `birthProgress` is computed with an earlier start range.
+
+### D6. Authored Fragment Motion (4 Groups)
+
+All groups share: subtle differences in speed, trajectory curvature, and timing. No fragment moves directly radially outward at constant speed.
+
+**Passers** (~30% of primary fragments):
+- Radiate outward from sphere center
+- Grow 2–3× as they approach camera (depth scaling)
+- Slight foreground blur (increased shadow blur)
+- Speed increases near camera
+- Fade past midway point
+- Creates "flying through debris" sensation
+- Only a minority — avoids visual chaos
+
+**Ascenders** (~25%):
+- Rise upward with slight lateral drift
+- Shrink as they recede
+- Some follow slightly curved trajectories (sinusoidal x-offset)
+- Fade at distance
+
+**Drifters** (~25%):
+- Lateral scatter with varied direction
+- Moderate speed
+- Some lag behind others
+- Fills the mid-ground composition
+
+**Settlers** (~20%):
+- Navigate toward fixed target positions (viewport edges/corners)
+- Smooth eased interpolation from sphere origin to target
+- Material transitions from purple-glow to soft pastel white
+- Become the decorative ambient spheres of the selection environment
+- Fragment → selection continuity
+
+### D7. Smoky Atmospheric Character
+
+Restrained use of:
+- Low-frequency noise (via gradient offset variation per frame)
+- Opacity modulation (subtle alpha breathing: ±0.05 at ~0.5Hz)
+- Soft turbulence (slight position jitter: ±0.5px per frame)
+
+**Explicitly prohibited:**
+- Foggy/cloudy appearance
+- Visible trails or streaks
+- Heavy blur that obscures fragments
+- Smoke simulation
+
+The effect remains: **elegant, soft, quantum, premium.**
+
+---
+
+## E. Launch Pad Reveal
+
+### E1. Oversized First Appearance (Cinematic Title Card)
+
+When "Launch Pad" first becomes visible (~progress 0.85), it renders at approximately **250% of its final size** via `transform: scale(2.5)`.
+
+**Visual criterion**: The heading dominates ~70–75% of viewport width while remaining legible and compositionally controlled. If 250% overshoots or undershoots this target, adjust the scale value.
+
+This is the **second cinematic title card** of the experience. It communicates: *"I have arrived somewhere new."*
+
+### E2. Brief Dominance Hold (progress 0.88–0.90)
+
+The giant heading lingers intentionally. This is NOT dead time — it is a cinematic beat where the viewer registers the new environment. The hold duration is short (progress span ~0.02 of the 500vh track ≈ 10vh of scroll).
+
+### E3. Camera-Like Pullback (progress 0.90–0.93)
+
+The scale-down must NOT be a simple CSS `scale(2.5) → scale(1)` tween.
+
+**Combined properties for camera-framing feel:**
+- `transform: scale()` — 2.5 → 1.0 with easeOutCubic
+- `translateY()` — slight upward shift (title rises into its final position as the "camera" pulls back)
+- Subtle perspective influence — the container can have a very slight perspective adjustment during this phase
+- Environmental parallax — aurora/grain/settler particles shift slightly during the pullback, reinforcing spatial movement
+
+**Visual criterion**: The viewer should feel the camera is pulling back to reveal the complete Launch Pad world — not that a CSS property is changing.
+
+### E4. Subtitle Reveal (progress 0.93–0.95)
+
+After Launch Pad reaches final framing, brief breathing room, then:
+- "Ready for your next mission?" + description
+- Entrance via `clip-path: inset(0 0 100% 0)` → `inset(0 0 0% 0)` + upward `translateY`
+- **Never fades** — all major typography remains fully opaque
+- Eased with `easeOutCubic`
+
+### E5. Card Entrance (progress 0.95–0.99)
+
+Cards are the final reward.
+
+- Card 1: progress 0.95–0.98
+- Card 2: progress 0.96–0.99
+- Each: `translateY(60px) scale(0.96)` → `translateY(0) scale(1.0)` + clip-path reveal
+- Subtle stagger creates a "one-two" rhythm
+- Slight spring overshoot in the easing for liveliness
+
+**Visual criterion**: Cards should feel like two selectable destinations in a game world — not ordinary webpage cards entering with a fade.
+
+### E6. Final Interactive State (progress > 0.97)
+
+- `pointerEvents: 'auto'` enabled
+- Card 3D tilt follows mouse via `requestAnimationFrame` lerp
+- Shadow responds to tilt angle
+- Card image micro-movement on hover (`scale(1.05)`)
+- Environment remains alive: aurora gradient cycling, paper grain, settler sphere ambient drift
+
+The page must NOT feel dead after scrolling stops. It should feel like a **living game-world destination hub**.
+
+---
+
+## F. Visual / Material System
+
+### Shader Strategy
+- **One ShaderMaterial** for the sphere — Fresnel + vertex displacement. No post-processing.
+- **2D Canvas** for particles — double-pass radial gradients for smoky sphere rendering.
+- **CSS** for Q_QUEST material — layered text-shadow, gradient fill, subtle stroke.
+- **CSS** for environment — gradient backgrounds, keyframe animations, opacity transitions.
+
+### Atmospheric Effects
+- **Stars**: CSS `radial-gradient` dots. Fade motivated by sphere dominance (not by timer). Visual criterion: stars should feel like they're being "drowned out" by the sphere's presence, not simply turned off.
+- **Nebula**: Two overlapping `radial-gradient` ellipses (purple + pink). Scale 1.0→1.15 during hold. Dissolves during emergence.
+- **Vignette**: `radial-gradient(circle, transparent, rgba(0,0,0,0.6))`. Fades by 0.80.
+
+### Sphere Fresnel / Smoked Glass
+- Fresnel: `pow(1.0 - dot(N, V), 3.0)` — edge glow, dark center.
+- Breathing: `0.8 + 0.2 * sin(time * 2.0)`.
+- Creates the "dark glass sphere" look from the Title Page design reference.
+
+### Aurora
+- CSS `linear-gradient` with 6 color stops cycling via `@keyframes auroraFlow`.
+- 400% background-size, 20s infinite animation.
+- Fades in at progress 0.80–0.92.
+
+### Depth Hierarchy / Focus Cues
+
+Restrained cinematic focus treatment across the Z-axis:
+
+| Depth Layer | Visual Treatment |
+|-------------|-----------------|
+| Far background (stars, nebula) | Very slow parallax movement, softer, less saturated |
+| Midground (HUD grid, atmosphere) | Moderate parallax, sharper |
+| Main sphere | Camera-controlled movement, sharpest, most saturated |
+| Foreground fragments (passers) | Faster movement, larger, slightly softer (increased shadow blur), depth-based brightness boost |
+
+**Explicitly prohibited**: Aggressive blur, artificial "movie camera" bokeh, anything that harms readability.
+
+### Environmental Architecture (HUD + Stars)
+
+The HUD grid and star field should NOT merely fade away. During the camera approach, they should feel like environmental architecture yielding to the sphere:
+
+- **HUD Grid**: Subtle mouse-parallax (existing). As the sphere dominates (progress 0.50–0.70), the grid's opacity decreases gradually. The grid "becomes quieter" rather than "getting turned off."
+- **Star Field**: Dims as the sphere's visual weight increases (progress 0.30–0.65). Stars should feel "drowned out" by the sphere's presence.
+
+The disappearance of both must feel **motivated by the camera journey**, not by an arbitrary opacity timer.
+
+---
+
+## G. Performance
+
+### Three.js Lifecycle
+- Single `WebGLRenderer` with `alpha: true`, pixelRatio capped at 2.
+- `animate()` loop runs only when `progress < 0.74`. **Pauses** (not destroys) by setting `isActive = false`.
+- Reactivated on reverse scroll when `progress < 0.74`.
+- No scene recreation, no WebGL reinitialization, no lost shader state.
+
+### Canvas Lifecycle
+- 2D particle canvas loop runs only when `0.64 < progress < 0.98`.
+- Clears and skips rendering outside that range.
+- Particles re-initialize cleanly on reverse scroll below 0.64.
+
+### Particle Rendering Budget
+- Each primary fragment: 2 draw calls (halo pass + body pass)
+- Each secondary fragment: 1 draw call
+- Desktop max: 55 primary × 2 + 25 secondary × 1 = 135 draw calls per frame
+- Well within 2D canvas budget for 60 FPS
+
+### React Render Avoidance
+- All animation is imperative: `ref.current.style.x = ...`
+- No `useState` drives any visual property
+- `subscribe()` pattern avoids context re-renders
+- GSAP ScrollTrigger `scrub: 1` for smooth interpolation
+
+### Reverse Scroll
+All components must reverse cleanly:
+```
+cards → Launch Pad → light environment → fragments reform → sphere → Q_QUEST
+```
+No popping, no scene recreation, no visual jumps, no timeline desynchronization.
+
+---
+
+## H. Testing Protocol
+
+### H1. Chrome as Final Visual Authority
+
+> **Passing technical tests is not sufficient. The rendered visual quality must be evaluated and iterated in Chrome.**
+
+### H2. Mandatory Chrome Testing Sequence
+
+1. Start the application (`npm run dev`)
+2. Open `http://localhost:3000/home` in Chrome
+3. **Inspect initial state**: Q_QUEST size, position, material quality, sphere visibility, HUD, stars, overall first impression. Ask: *"Does this immediately feel like entering a game world?"*
+4. **Scroll slowly** through entire sequence — every intermediate frame should look intentional
+5. **Stop at the sphere hold** (progress ~0.60) — sphere should feel enormous, alive, mysterious
+6. **Inspect the fracture** — fragments should be translucent smoky spheres, not dots or fireworks
+7. **Inspect the first fragment** — it should appear deliberate, not simultaneous with all others
+8. **Inspect the passage** — far/mid/near hierarchy, no visual chaos
+9. **Inspect the environment transition** — dark→purple→lavender→pastel, not a simple crossfade
+10. **Inspect the oversized Launch Pad** — ~70-75% viewport dominance, legible, monumental
+11. **Inspect the Launch Pad scale-down** — should feel like camera pullback, not CSS tween
+12. **Inspect subtitle/card timing** — breathing room between elements, no premature entrance
+13. **Test the final state** — cards interactive, tilt works, environment alive
+14. **Reverse scroll** all the way to the top — no popping, no reinit, no jumps
+15. **Test at multiple speeds**: very slow, normal, fast, stop-and-go, rapid reverse
+16. **Test multiple viewports**: 1920×1080, 1440×900, 1366×768, 1024px wide, 390px wide
+17. **Inspect console** — zero runtime/WebGL/React/animation errors
+18. **Inspect frame rate** — target 60 FPS via DevTools Performance tab
+19. **Make refinements** based on visual results
+20. **Repeat** until improvements are genuinely marginal
+
+### H3. Autonomous Visual Iteration Loop
+
+```
+IMPLEMENT → CHROME → OBSERVE → FIND WEAKNESS → REFINE → RELOAD → OBSERVE → REPEAT
+```
+
+The agent should independently identify and fix:
+- Weak material quality
+- Flat or identical-looking fragments
+- Poor timing or pacing
+- Bad composition at any scroll position
+- Excessive glow or effects
+- Awkward scaling transitions
+- Premature card entrance
+- Abrupt environmental changes
+- Lack of game-like presence
+- Dead-feeling final state
+
+### H4. Awwwards-Level Acceptance Criteria
+
+| Category | Criterion |
+|----------|-----------|
+| **Composition** | Every major scroll frame looks intentional |
+| **Typography** | Q_QUEST feels material and premium — smoked glass, not flat text |
+| **Camera** | The viewer feels like they're travelling through a scene |
+| **Materials** | All objects feel like they belong to the same quantum world |
+| **Fracture** | The sphere *transforms* rather than *explodes* |
+| **Transition** | The new environment *emerges* rather than *appears* |
+| **Launch Pad** | The second title card feels *monumental* before resolving |
+| **Cards** | They feel like game-world destinations |
+| **Game Feel** | The experience feels like entering a world and arriving at a choice |
+| **Restraint** | Nothing looks like an effect added merely because it was possible |
+
+---
+
+## I. Proposed File Changes
+
+### [MODIFY] [home.module.css](file:///C:/Q-Quest/app/home/home.module.css)
+- Increase `.heroLetters` font-size by ~25%
+- Add smoked-glass material treatment (gradient fill, text-shadow layers, subtle stroke, noise pseudo-element)
+- Responsive adjustments for enlarged title
+
+### [MODIFY] [HeroTitle.tsx](file:///C:/Q-Quest/app/home/components/HeroTitle.tsx)
+- Update to use new smoked-glass CSS classes
+- Ensure noise pseudo-element structure
+
+### [MODIFY] [SphereScene.tsx](file:///C:/Q-Quest/app/home/components/SphereScene.tsx)
+- Tune glow intensification range (1.0→1.8 starting value)
+- Add micro-instability phase starting at progress 0.64
+- Adjust Fresnel power for more dramatic edge glow during hold
+
+### [MODIFY] [ParticleField.tsx](file:///C:/Q-Quest/app/home/components/ParticleField.tsx)
+- Implement two-tier fragment system (primary + secondary)
+- Reduce and restructure particle counts
+- Add staged fracture with first-fragment event
+- Enrich fragment rendering: double-pass gradient, smoky halo, depth shading
+- Per-fragment material variation (alpha, glow, highlight, color)
+- Non-uniform size distribution
+- Subtle atmospheric effects (alpha breathing, micro-jitter)
+
+### [MODIFY] [SelectionReveal.tsx](file:///C:/Q-Quest/app/home/components/SelectionReveal.tsx)
+- Implement oversized "Launch Pad" first appearance with dominance hold
+- Camera-like pullback: combined scale + translateY + environmental parallax
+- Adjust timing: title at 0.85, hold at 0.88–0.90, pullback 0.90–0.93
+- Add subtle spring overshoot to card entrance easing
+
+### [MODIFY] [EnvironmentLayers.tsx](file:///C:/Q-Quest/app/home/components/EnvironmentLayers.tsx)
+- Fine-tune atmosphere color stops for smoother transition
+- Ensure star fade feels motivated (not abrupt timer)
+- Nebula intensification during hold
+
+### [MODIFY] [HudGrid.tsx](file:///C:/Q-Quest/app/home/components/HudGrid.tsx)
+- Ensure grid dissolution feels motivated by camera journey
+- Grid "becomes quieter" rather than "getting turned off"
+
+No new files needed. No changes to other pages (`/`, `/loading`, `/selection`, `/sandbox/*`).
+
+---
+
+## J. Future Audio (NOT Implemented This Iteration)
+
+Future support could allow:
+- Ambient quantum hum
+- Subtle sphere approach tone
+- Fracture sound
+- Arrival confirmation
+
+No autoplay. No blocking of current implementation. Audio architecture is out of scope.
+
+---
+
+## K. Final Visual Story
+
+```
+Q_QUEST
+    ↓
+smoked glass / frosted quantum material — bold, dominant, subtly dimensional
+    ↓
+camera approaches through the void
+    ↓
+HUD grid and stars yield to the sphere's presence
+    ↓
+title physically exits upward (never fades)
+    ↓
+sphere becomes dominant — enormous, alive, mysterious
+    ↓
+cinematic anticipation hold
+    ↓
+micro surface instability
+    ↓
+first smoky sphere fragment deliberately detaches
+    ↓
+progressive fragmentation — a transformation, not an explosion
+    ↓
+camera passes through translucent smoky fragments
+    ↓
+dark quantum world becomes lavender/pastel
+    ↓
+fragments become atmospheric settlers
+    ↓
+HUGE "LAUNCH PAD" — second cinematic title card
+    ↓
+brief dominance hold
+    ↓
+camera-like pullback reveals the selection world
+    ↓
+Launch Pad resolves to final position
+    ↓
+mission text enters via spatial reveal
+    ↓
+cards appear as game-world destinations
+    ↓
+living interactive destination hub
+```
+
+> **"I didn't just scroll through a website. I entered Q-Quest."**
