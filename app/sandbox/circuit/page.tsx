@@ -1,84 +1,87 @@
 'use client';
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function CircuitSandboxPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const cards = document.querySelectorAll('.card-item') as NodeListOf<HTMLElement>;
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>('.card-item')
+    );
+    const prefersStaticCards = window.matchMedia(
+      '(hover: none), (pointer: coarse), (prefers-reduced-motion: reduce)'
+    ).matches;
 
-    function updateCardStates(activeCard: HTMLElement) {
-        cards.forEach(card => {
-            if (card === activeCard) {
-                card.style.zIndex = '100';
-                card.classList.add('card-active');
-            } else {
-                card.style.zIndex = '10';
-                card.classList.remove('card-active');
-            }
-        });
-    }
+    if (prefersStaticCards) return;
 
-    function resetAllCards() {
-        cards.forEach((card, index) => {
-            card.classList.remove('card-active');
-            card.style.zIndex = index === 0 ? '20' : '21';
-        });
-    }
+    const updateCardStates = (activeCard: HTMLElement) => {
+      cards.forEach((card) => {
+        const isActive = card === activeCard;
+        card.style.zIndex = isActive ? '100' : '10';
+        card.classList.toggle('card-active', isActive);
+      });
+    };
 
-    cards.forEach(card => {
-        card.addEventListener('mouseenter', () => {
-            updateCardStates(card);
-            card.style.transition = 'transform 300ms cubic-bezier(0.19, 1, 0.22, 1), box-shadow 300ms cubic-bezier(0.19, 1, 0.22, 1)';
-        });
+    const resetCardTransform = (card: HTMLElement) => {
+      card.style.transition =
+        'transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms cubic-bezier(0.19, 1, 0.22, 1)';
+      card.style.setProperty('--ry', '0deg');
+      card.style.setProperty('--rx', '0deg');
+      card.style.setProperty('--mx', '0px');
+      card.style.setProperty('--my', '0px');
+    };
 
-        card.addEventListener('mousemove', (e) => {
-            if (!card.classList.contains('card-active')) return;
-            
-            const rect = card.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            
-            const percentX = (x - centerX) / centerX;
-            const percentY = (y - centerY) / centerY;
-            
-            const maxRot = 4;
-            const maxTrans = 8;
-            
-            card.style.transition = 'transform 100ms ease-out, box-shadow 300ms ease-out';
-            card.style.setProperty('--ry', `${percentX * maxRot}deg`);
-            card.style.setProperty('--rx', `${-percentY * maxRot}deg`);
-            card.style.setProperty('--mx', `${percentX * maxTrans}px`);
-            card.style.setProperty('--my', `${percentY * maxTrans}px`);
-        });
+    const cleanups = cards.map((card) => {
+      const handleEnter = () => {
+        updateCardStates(card);
+        card.style.transition =
+          'transform 300ms cubic-bezier(0.19, 1, 0.22, 1), box-shadow 300ms cubic-bezier(0.19, 1, 0.22, 1)';
+      };
+      const handleMove = (event: MouseEvent) => {
+        if (!card.classList.contains('card-active')) return;
 
-        card.addEventListener('mouseleave', () => {
-            card.style.transition = 'transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms cubic-bezier(0.19, 1, 0.22, 1)';
-            card.style.setProperty('--ry', '0deg');
-            card.style.setProperty('--rx', '0deg');
-            card.style.setProperty('--mx', '0px');
-            card.style.setProperty('--my', '0px');
-        });
+        const rect = card.getBoundingClientRect();
+        const percentX =
+          (event.clientX - rect.left - rect.width / 2) / (rect.width / 2);
+        const percentY =
+          (event.clientY - rect.top - rect.height / 2) / (rect.height / 2);
+
+        card.style.transition = 'transform 100ms ease-out, box-shadow 300ms ease-out';
+        card.style.setProperty('--ry', `${percentX * 4}deg`);
+        card.style.setProperty('--rx', `${-percentY * 4}deg`);
+        card.style.setProperty('--mx', `${percentX * 8}px`);
+        card.style.setProperty('--my', `${percentY * 8}px`);
+      };
+      const handleLeave = () => resetCardTransform(card);
+
+      card.addEventListener('mouseenter', handleEnter);
+      card.addEventListener('mousemove', handleMove);
+      card.addEventListener('mouseleave', handleLeave);
+
+      return () => {
+        card.removeEventListener('mouseenter', handleEnter);
+        card.removeEventListener('mousemove', handleMove);
+        card.removeEventListener('mouseleave', handleLeave);
+      };
     });
 
-    const stackContainer = document.querySelector('.card-stack') as HTMLElement;
-    if (stackContainer) {
-        stackContainer.addEventListener('mouseleave', () => {
-            resetAllCards();
-            cards.forEach(card => {
-                card.style.transition = 'transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms cubic-bezier(0.19, 1, 0.22, 1)';
-                card.style.setProperty('--ry', '0deg');
-                card.style.setProperty('--rx', '0deg');
-                card.style.setProperty('--mx', '0px');
-                card.style.setProperty('--my', '0px');
-            });
-        }, { passive: true });
-    }
+    const stackContainer = document.querySelector<HTMLElement>('.card-stack');
+    const handleStackLeave = () => {
+      cards.forEach((card, index) => {
+        card.classList.remove('card-active');
+        card.style.zIndex = index === 0 ? '20' : '21';
+        resetCardTransform(card);
+      });
+    };
+    stackContainer?.addEventListener('mouseleave', handleStackLeave);
+
+    return () => {
+      cleanups.forEach((cleanup) => cleanup());
+      stackContainer?.removeEventListener('mouseleave', handleStackLeave);
+    };
   }, []);
 
   return (
@@ -169,6 +172,84 @@ export default function CircuitSandboxPage() {
             z-index: 5;
             border-radius: inherit;
         }
+
+
+        @media (max-width: 900px) {
+            .sandbox-main {
+                padding-top: 5rem !important;
+                padding-bottom: 3rem !important;
+            }
+
+            .sandbox-heading-block {
+                width: 100%;
+                margin: 1rem auto 2rem !important;
+                padding: 0 0.5rem;
+            }
+
+            .sandbox-title {
+                max-width: 100%;
+                margin-bottom: 1rem !important;
+                font-size: clamp(2.25rem, 10vw, 4rem) !important;
+                line-height: 1.05 !important;
+                white-space: normal !important;
+                overflow-wrap: anywhere;
+            }
+
+            .card-stack {
+                height: auto !important;
+                min-height: 0;
+                flex-direction: column;
+                gap: 1.5rem;
+                perspective: none;
+            }
+
+            .card-item {
+                position: relative !important;
+                width: min(100%, 380px) !important;
+                height: 500px !important;
+                flex: 0 0 auto;
+                transform: none !important;
+            }
+
+            .card-active {
+                --s: 1 !important;
+                --ty: 0px !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .card-item {
+                height: 480px !important;
+                border-radius: 24px;
+            }
+
+            .card-item > div {
+                border-radius: 24px;
+            }
+        }
+
+        @media (hover: none), (pointer: coarse) {
+            .card-item {
+                transform: none !important;
+            }
+
+            .btn-go:active {
+                transform: scale(0.98);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .aurora-bg {
+                animation: none;
+            }
+
+            .card-item,
+            .btn-go,
+            .btn-go .arrow-icon {
+                transition: none !important;
+                will-change: auto;
+            }
+        }
       `}} />
 
       <div className="bg-transparent font-['Inter',_sans-serif] text-[#191c1e] min-h-screen flex flex-col relative overflow-x-hidden">
@@ -179,17 +260,23 @@ export default function CircuitSandboxPage() {
         <header className="docked full-width top-0 no-border bg-transparent flat no-shadows z-50 absolute">
           <nav className="flex items-center px-[24px] py-[12px] w-full max-w-7xl mx-auto relative justify-center gap-8">
             <div className="flex-1 flex justify-end lg:justify-start">
-              <div onClick={() => router.push('/selection')} className="cursor-pointer font-['Space_Grotesk',_sans-serif] text-[24px] font-bold tracking-tighter text-[#191c1e] whitespace-nowrap">Q-QUEST</div>
+              <button
+                type="button"
+                onClick={() => router.push('/selection')}
+                className="cursor-pointer bg-transparent border-0 p-0 font-['Space_Grotesk',_sans-serif] text-[24px] font-bold tracking-tighter text-[#191c1e] whitespace-nowrap"
+              >
+                Q-QUEST
+              </button>
             </div>
             <div className="flex justify-center gap-6"></div>
             <div className="flex-1 flex justify-end"></div>
           </nav>
         </header>
         
-        <main className="flex-grow flex flex-col relative pt-24 pb-32 z-20 bg-transparent">
+        <main className="sandbox-main flex-grow flex flex-col relative pt-24 pb-32 z-20 bg-transparent">
           <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl flex flex-col items-center justify-center flex-grow">
-            <div className="text-center max-w-3xl mx-auto mb-16 mt-8 flex flex-col items-center">
-              <h1 className="font-['Space_Grotesk',_sans-serif] text-[64px] font-bold text-[#674bb5] mb-6 whitespace-nowrap tracking-wide drop-shadow-sm leading-[1.1]">Circuit Playground</h1>
+            <div className="sandbox-heading-block text-center max-w-3xl mx-auto mb-16 mt-8 flex flex-col items-center">
+              <h1 className="sandbox-title font-['Space_Grotesk',_sans-serif] text-[64px] font-bold text-[#674bb5] mb-6 whitespace-nowrap tracking-wide drop-shadow-sm leading-[1.1]">Circuit Playground</h1>
               <p className="font-['Inter',_sans-serif] text-[18px] text-[#494552] max-w-xl mx-auto leading-relaxed text-center font-medium">Where quantum ideas come to life.</p>
             </div>
             
@@ -201,7 +288,13 @@ export default function CircuitSandboxPage() {
                   <div className="bg-gradient-to-b from-white/90 to-white/60 backdrop-blur-md rounded-[26px] flex flex-col h-full relative border border-white/50 p-3">
                     
                     <div className="relative w-full h-[240px] rounded-[18px] overflow-hidden border-2 border-white/60 shadow-inner bg-[#cebdff]/30">
-                      <img alt="A whimsical, 3D rendered illustration of a quantum circuit playground" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKe7wbcNg0HzI5n1vp6oimhl6oi4HVTksg9yz2M_WtkZuPM725XtZdzQ_WgmSgzMAdHu_f0x6so9LGeOTVT366WkxdDHSlghy83FdZbL9EWVpBhJZWUmTiKdSZRw1-mHwrTMyMYk8XWiJIe-Y00WcmnTRUCdT3q153d-nM9SgxB87irk5586sA73CvdQUv1gg0YmxLQ3uJZuRABqOXaNttkavHNDfXnCns6rjNNOMJuOmvFZfOYi4gN38U6P5TrM5Q4dDYVFE12-Kg" />
+                      <Image
+                        alt="A whimsical, 3D rendered illustration of a quantum circuit playground"
+                        className="object-cover"
+                        fill
+                        sizes="(max-width: 768px) 380px, 420px"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKe7wbcNg0HzI5n1vp6oimhl6oi4HVTksg9yz2M_WtkZuPM725XtZdzQ_WgmSgzMAdHu_f0x6so9LGeOTVT366WkxdDHSlghy83FdZbL9EWVpBhJZWUmTiKdSZRw1-mHwrTMyMYk8XWiJIe-Y00WcmnTRUCdT3q153d-nM9SgxB87irk5586sA73CvdQUv1gg0YmxLQ3uJZuRABqOXaNttkavHNDfXnCns6rjNNOMJuOmvFZfOYi4gN38U6P5TrM5Q4dDYVFE12-Kg"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/40 pointer-events-none"></div>
                     </div>
                     
@@ -239,9 +332,9 @@ export default function CircuitSandboxPage() {
                         <span className="px-3 py-1 bg-[#C3A6FF]/30 text-[#2D1B36] text-[11px] font-bold uppercase tracking-wider rounded-full border border-[#C3A6FF]/50">Quantum</span>
                       </div>
                       
-                      <button className="btn-go group mt-4 w-full bg-gradient-to-r from-[#D4B3FF] to-[#A880FF] p-2 rounded-full flex items-center shadow-[inset_0_2px_4px_0_rgba(255,255,255,0.3)] hover:shadow-[0_45px_80px_-20px_rgba(0,0,0,0.3)] relative z-10">
+                      <button type="button" aria-label="Circuit Playground selected" className="btn-go group mt-4 w-full bg-gradient-to-r from-[#D4B3FF] to-[#A880FF] p-2 rounded-full flex items-center shadow-[inset_0_2px_4px_0_rgba(255,255,255,0.3)] hover:shadow-[0_45px_80px_-20px_rgba(0,0,0,0.3)] relative z-10">
                         <span className="font-['Space_Grotesk',_sans-serif] text-[20px] font-bold text-[#2D1B36] ml-8 flex-grow text-left uppercase tracking-wide">
-                            LET'S GO!
+                            LET&apos;S GO!
                         </span>
                         <div className="bg-white rounded-full w-14 h-14 flex items-center justify-center shadow-sm group-hover:bg-[#f8f9fc] transition-colors">
                             <span className="arrow-icon material-symbols-outlined text-[#2D1B36] font-bold text-2xl">arrow_forward</span>
@@ -253,7 +346,14 @@ export default function CircuitSandboxPage() {
               </div>
               
               {/* Right Card: Research Vault */}
-              <div onClick={() => router.push('/sandbox/research')} className="card-item w-[380px] md:w-[420px] h-[520px] cursor-pointer card-right" id="card-right" style={{ zIndex: 10 }}>
+              <button
+                type="button"
+                aria-label="Open Research Vault"
+                onClick={() => router.push('/sandbox/research')}
+                className="card-item w-[380px] md:w-[420px] h-[520px] cursor-pointer card-right border-0 bg-transparent p-0 text-left"
+                id="card-right"
+                style={{ zIndex: 10 }}
+              >
                 <div className="paper-grain bg-[#2D1B36] rounded-[32px] p-10 flex flex-col justify-between h-full relative overflow-hidden">
                   <div className="flex justify-between items-start relative z-10">
                     <div className="bg-[#C3A6FF]/20 p-2 rounded-xl">
@@ -271,7 +371,7 @@ export default function CircuitSandboxPage() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
         </main>

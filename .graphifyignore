@@ -1,12 +1,7 @@
-# Keep the knowledge graph about Q-Quest, not about the tooling that lives
-# alongside it. Before this file, 658 of 875 nodes (75%) came from .claude/ --
-# 555 from the single vendored file skills/impeccable/scripts/live-browser.js.
+# Keep the knowledge graph about Q-Quest, not about adjacent tooling.
 #
 # Syntax is gitignore-style. Re-run `graphify extract . --code-only --force`
 # after editing.
-
-# Vendored assistant tooling: skills, agents, bundled JS. Not your code.
-.claude/
 
 # Derived data / build output (already gitignored, listed for --no-gitignore runs)
 graphify-out/

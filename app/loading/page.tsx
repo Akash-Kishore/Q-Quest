@@ -69,7 +69,8 @@ export default function LoadingPage() {
             justify-content: center;
             align-items: center;
             width: 100vw;
-            height: 100vh;
+            height: 100dvh;
+            min-height: 100dvh;
             overflow: hidden;
             background-image: radial-gradient(ellipse at top right, rgba(255,255,255,0.2), #9d4edd, #5a189a);
         }
@@ -261,6 +262,102 @@ export default function LoadingPage() {
         .animate-pulse-custom {
             animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+
+        @media (max-width: 900px) {
+            .main-layout {
+                grid-template-columns: minmax(0, 1fr);
+                width: min(100%, 560px);
+                max-height: 100dvh;
+                padding: 4rem clamp(1.25rem, 6vw, 3rem);
+                gap: clamp(1rem, 3vh, 1.75rem);
+            }
+
+            #process-list-container {
+                width: 100%;
+                height: 192px;
+                font-size: clamp(0.65rem, 2.5vw, 0.875rem);
+            }
+
+            .process-line {
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            #loading-status {
+                font-size: clamp(1.25rem, 6vw, 1.75rem);
+                line-height: 1.2;
+                letter-spacing: clamp(0.2em, 3vw, 0.5em);
+            }
+
+            .telemetry-section {
+                align-items: stretch;
+                gap: 1rem;
+                text-align: left;
+            }
+
+            .telemetry-p {
+                max-width: none;
+                margin: 0;
+                font-size: clamp(0.625rem, 2.3vw, 0.75rem);
+                line-height: 1.45;
+            }
+
+            .telemetry-grid {
+                font-size: clamp(0.625rem, 2.3vw, 0.75rem);
+                column-gap: 1rem;
+                row-gap: 0.625rem;
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 600px) {
+            .main-layout {
+                grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                width: 100%;
+                max-width: none;
+                padding: 2rem 3rem;
+                gap: 1.5rem;
+            }
+
+            #process-list-container {
+                height: 192px;
+                font-size: 0.625rem;
+            }
+
+            #loading-status {
+                font-size: 1.1rem;
+                letter-spacing: 0.35em;
+            }
+
+            .telemetry-section {
+                gap: 0.75rem;
+                text-align: right;
+            }
+
+            .telemetry-p,
+            .telemetry-grid {
+                font-size: 0.575rem;
+            }
+        }
+
+        @media (max-height: 680px) and (max-width: 900px) {
+            .main-layout {
+                padding-top: 2.5rem;
+                padding-bottom: 2.5rem;
+                gap: 0.75rem;
+            }
+            #process-list-container { height: 144px; }
+            .telemetry-p {
+                display: block;
+                line-height: 1.35;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .main-layout { animation: none; opacity: 1; }
+            .animate-pulse-custom { animation: none; }
+            .content-wrapper,
+            #process-scroller { transition: none; }
+        }
       `}} />
 
       <div className="terminal-container">
@@ -308,7 +405,7 @@ export default function LoadingPage() {
             {/* RIGHT: TELEMETRY */}
             <div className="telemetry-section">
               <p className="telemetry-p">
-                  // HANG TIGHT, EXPLORER. THE DATA TRANSFER IS IN PROGRESS. CALIBRATING REINFORCEMENT LEARNING AGENTS FOR OPTIMAL RESONANCE.
+                  {'// HANG TIGHT, EXPLORER. THE DATA TRANSFER IS IN PROGRESS. CALIBRATING REINFORCEMENT LEARNING AGENTS FOR OPTIMAL RESONANCE.'}
               </p>
               <div className="telemetry-divider"></div>
               <div className="telemetry-grid">

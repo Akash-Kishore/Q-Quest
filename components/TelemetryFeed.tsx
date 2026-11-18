@@ -24,7 +24,7 @@ export default function TelemetryFeed() {
   return (
     <div className="text-right flex flex-col items-end gap-8 font-mono">
       <p className="text-white text-[14px] leading-relaxed max-w-[340px] opacity-80">
-        // HANG TIGHT, EXPLORER. THE DATA TRANSFER IS IN PROGRESS. CALIBRATING REINFORCEMENT LEARNING AGENTS FOR OPTIMAL RESONANCE.
+        {'// HANG TIGHT, EXPLORER. THE DATA TRANSFER IS IN PROGRESS. CALIBRATING REINFORCEMENT LEARNING AGENTS FOR OPTIMAL RESONANCE.'}
       </p>
       
       <div className="h-[1px] w-full bg-white/20"></div>

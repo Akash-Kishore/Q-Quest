@@ -16,10 +16,6 @@ function rangeProgress(progress: number, start: number, end: number): number {
   return clamp01((progress - start) / (end - start));
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
 // ---------------------------------------------------------------------------
 // 2.5D sphere shader — frosted quantum glass
 // ---------------------------------------------------------------------------

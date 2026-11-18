@@ -1,19 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion, useSpring, useTransform } from 'framer-motion';
+import { useState, MouseEvent as ReactMouseEvent } from 'react';
+import Image from 'next/image';
+import { motion, useSpring } from 'framer-motion';
 
 interface CardStackProps {
   initialActiveCard: 'left' | 'right';
 }
 
 export default function CardStack({ initialActiveCard }: CardStackProps) {
-  const router = useRouter();
   const [activeCard, setActiveCard] = useState<'left' | 'right'>(initialActiveCard);
-
-  const leftCardRef = useRef<HTMLDivElement>(null);
-  const rightCardRef = useRef<HTMLDivElement>(null);
 
   const updateCardStates = (active: 'left' | 'right') => {
     setActiveCard(active);
@@ -137,7 +133,13 @@ function CardItem({ id, isActive, defaultZIndex, defaultTransform, onHover, imag
         
         <div className="bg-gradient-to-b from-white/90 to-white/60 backdrop-blur-md rounded-[26px] flex flex-col h-full relative border border-white/50 p-3">
           <div className="relative w-full h-[240px] rounded-[18px] overflow-hidden border-2 border-white/60 shadow-inner bg-[#cebdff]/30">
-            <img alt={title} className="w-full h-full object-cover" src={imageSrc} />
+            <Image
+              alt={title}
+              className="object-cover"
+              fill
+              sizes="(max-width: 768px) 380px, 420px"
+              src={imageSrc}
+            />
             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/40 pointer-events-none"></div>
           </div>
           <div className="flex-grow flex flex-col mt-4 text-[#191c1e]">
@@ -175,7 +177,7 @@ function CardItem({ id, isActive, defaultZIndex, defaultTransform, onHover, imag
                 className="mt-4 w-full bg-gradient-to-r from-[#D4B3FF] to-[#A880FF] p-2 rounded-full flex items-center shadow-lg hover:scale-[1.02] transition-transform group"
               >
                 <span className="font-headline text-[16px] font-bold text-[#2D1B36] ml-6 flex-grow text-left uppercase tracking-wide">
-                  LET'S GO!
+                  LET&apos;S GO!
                 </span>
                 <div className="bg-white rounded-full w-10 h-10 flex items-center justify-center shadow-sm group-hover:bg-white transition-colors">
                   <span className="text-[#2D1B36] font-bold text-lg group-hover:translate-x-1 transition-transform">→</span>

@@ -7,7 +7,8 @@ export default function ThreeCanvas() {
   const mountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    const mount = mountRef.current;
+    if (!mount) return;
 
     // Scene Setup
     const scene = new THREE.Scene();
@@ -20,8 +21,8 @@ export default function ThreeCanvas() {
     renderer.setClearColor(0x000000, 0);
     
     // Cleanup any existing child nodes first
-    mountRef.current.innerHTML = '';
-    mountRef.current.appendChild(renderer.domElement);
+    mount.innerHTML = '';
+    mount.appendChild(renderer.domElement);
 
     const mainRotationGroup = new THREE.Group();
     scene.add(mainRotationGroup);
@@ -68,7 +69,14 @@ export default function ThreeCanvas() {
     const core = new THREE.Mesh(coreGeometry, coreMaterial);
     mainRotationGroup.add(core);
 
-    const electrons: Array<{ mesh: THREE.Mesh; group: THREE.Group; data: any }> = [];
+    interface OrbitData {
+      angle: number;
+      radiusX: number;
+      radiusZ: number;
+      speed: number;
+    }
+
+    const electrons: Array<{ mesh: THREE.Mesh; data: OrbitData }> = [];
     const numElectrons = 3; 
     const uniformRadius = 3.5;
     const inclinations = [Math.PI / 4, -Math.PI / 6, Math.PI / 2.5];
@@ -90,7 +98,7 @@ export default function ThreeCanvas() {
       orbitGroup.rotation.z = inclinations[i];
       orbitGroup.add(ellipse);
       orbitGroup.add(electron);
-      electrons.push({ mesh: electron, group: orbitGroup, data: orbitData });
+      electrons.push({ mesh: electron, data: orbitData });
       mainRotationGroup.add(orbitGroup);
     }
 
@@ -98,10 +106,10 @@ export default function ThreeCanvas() {
     let targetRotationY = 0;
     let currentRotationX = 0;
     let currentRotationY = 0;
-    let resetTimer: NodeJS.Timeout;
+    let resetTimer: ReturnType<typeof setTimeout> | undefined;
 
     const handleMouseMove = (e: MouseEvent) => {
-      clearTimeout(resetTimer);
+      if (resetTimer) clearTimeout(resetTimer);
       targetRotationY = ((e.clientX / window.innerWidth) - 0.5) * Math.PI;
       targetRotationX = ((e.clientY / window.innerHeight) - 0.5) * Math.PI;
       
@@ -152,12 +160,10 @@ export default function ThreeCanvas() {
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
-      clearTimeout(resetTimer);
+      if (resetTimer) clearTimeout(resetTimer);
       cancelAnimationFrame(animationFrameId);
       renderer.dispose();
-      if (mountRef.current) {
-        mountRef.current.innerHTML = '';
-      }
+      mount.innerHTML = '';
     };
   }, []);
 

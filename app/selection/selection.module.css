@@ -104,6 +104,8 @@
   will-change: transform, opacity;
   max-width: 56rem;
   padding: 0 1.5rem;
+  width: min(100%, 56rem);
+  box-sizing: border-box;
 }
 
 .systemLabel {
@@ -163,6 +165,7 @@
   max-width: 1200px;
   padding: 0 3rem 0;
   pointer-events: auto;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1024px) {
@@ -192,6 +195,8 @@
   transition: box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
   transform-style: preserve-3d;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card:hover {
@@ -199,6 +204,7 @@
 }
 
 .cardImageWrap {
+  position: relative;
   flex-grow: 1;
   display: flex;
   align-items: center;
@@ -274,12 +280,64 @@
 }
 
 @media (max-width: 640px) {
-  .card {
-    height: 360px;
-    padding: 1.25rem;
+  .heroInner {
+    padding: 0 1rem;
   }
+  .systemLabel {
+    max-width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+  }
+  .heroTitle {
+    margin-bottom: 1.25rem;
+    font-size: clamp(2.75rem, 15vw, 4.5rem);
+  }
+  .heroSubtitle {
+    font-size: clamp(0.9rem, 4vw, 1.05rem);
+    line-height: 1.45;
+  }
+  .cardsGrid {
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+  .card {
+    height: clamp(230px, 30dvh, 270px);
+    padding: 1rem;
+    box-shadow: 8px 8px 0 0 rgba(45, 27, 54, 1);
+  }
+  .cardImageWrap { margin-bottom: 0.75rem; }
+  .cardMeta { gap: 0.5rem; }
   .cardTitle {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .cardsGrid {
+    grid-template-columns: 1fr 1fr;
+    max-width: 760px;
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+
+  .card {
+    height: min(72dvh, 280px);
+    padding: 1rem;
+    box-shadow: 8px 8px 0 rgba(45, 27, 54, 1);
+  }
+
+  .cardImageWrap {
+    margin-bottom: 0.75rem;
+  }
+
+  .cardMeta {
+    gap: 0.5rem;
+  }
+
+  .cardTitle {
+    font-size: 1.25rem;
   }
 }
 

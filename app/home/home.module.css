@@ -463,6 +463,37 @@
   .cardBadge { font-size: 0.625rem; padding: 0.2rem 0.5rem; }
 }
 
+@media (orientation: landscape) and (max-height: 600px) {
+  .selectionContent { padding: 0.5rem 1rem; }
+  .selectionSystemLabel {
+    margin-bottom: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.6rem;
+  }
+  .selectionTitle {
+    margin-bottom: 0.35rem;
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+  }
+  .selectionSubtitle {
+    margin-bottom: 0.6rem;
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+  .selectionCardsGrid {
+    grid-template-columns: 1fr 1fr;
+    max-width: 760px;
+    gap: 1rem;
+  }
+  .card {
+    height: min(58dvh, 230px);
+    padding: 0.75rem;
+    box-shadow: 8px 8px 0 rgba(45, 27, 54, 1);
+  }
+  .cardImageWrap { margin-bottom: 0.5rem; }
+  .cardMeta { gap: 0.4rem; }
+  .cardTitle { font-size: 1.1rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auroraLayer { animation: none; }
   .heroLetters,

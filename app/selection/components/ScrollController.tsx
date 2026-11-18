@@ -4,6 +4,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useSyncExternalStore,
   createContext,
   useContext,
   type ReactNode,
@@ -30,6 +31,18 @@ interface ScrollContextValue {
 
 const ScrollContext = createContext<ScrollContextValue | null>(null);
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function subscribeToReducedMotion(onChange: () => void) {
+  const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+  mediaQuery.addEventListener('change', onChange);
+  return () => mediaQuery.removeEventListener('change', onChange);
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
 export function useScrollContext(): ScrollContextValue {
   const ctx = useContext(ScrollContext);
   if (!ctx) throw new Error('useScrollContext must be used within <ScrollController>');
@@ -48,14 +61,11 @@ export default function ScrollController({ children }: ScrollControllerProps) {
   const triggerRef = useRef<HTMLDivElement>(null);
   const subscribersRef = useRef<Set<ScrollSubscriber>>(new Set());
   const lenisRef = useRef<Lenis | null>(null);
-  const reducedMotion = useRef(false);
-
-  // Detect prefers-reduced-motion once
-  useEffect(() => {
-    reducedMotion.current = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
-  }, []);
+  const reducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    getReducedMotionSnapshot,
+    () => false
+  );
 
   // Subscribe helper — stable across renders
   const subscribe = useCallback((fn: ScrollSubscriber) => {
@@ -67,7 +77,7 @@ export default function ScrollController({ children }: ScrollControllerProps) {
 
   // Setup Lenis + GSAP
   useEffect(() => {
-    if (reducedMotion.current) {
+    if (reducedMotion) {
       // Immediately push progress = 1 so everything renders in final state
       subscribersRef.current.forEach((fn) => fn(1));
       return;
@@ -88,9 +98,10 @@ export default function ScrollController({ children }: ScrollControllerProps) {
 
     // Connect Lenis to GSAP's ticker
     lenis.on('scroll', ScrollTrigger.update);
-    gsap.ticker.add((time) => {
+    const tickerCallback = (time: number) => {
       lenis.raf(time * 1000);
-    });
+    };
+    gsap.ticker.add(tickerCallback);
     gsap.ticker.lagSmoothing(0);
 
     // --- ScrollTrigger ---
@@ -110,15 +121,15 @@ export default function ScrollController({ children }: ScrollControllerProps) {
       st.kill();
       lenis.destroy();
       lenisRef.current = null;
-      gsap.ticker.remove(lenis.raf as any);
+      gsap.ticker.remove(tickerCallback);
       ScrollTrigger.getAll().forEach((t) => t.kill());
     };
-  }, []);
+  }, [reducedMotion]);
 
   const contextValue: ScrollContextValue = {
     subscribe,
     triggerRef,
-    reducedMotion: reducedMotion.current,
+    reducedMotion,
   };
 
   return (

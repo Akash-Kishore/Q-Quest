@@ -82,16 +82,19 @@ export default function LandingPage() {
             --size-xl: calc(var(--base-size) * var(--ratio) * var(--ratio));
             --size-2xl: calc(var(--base-size) * var(--ratio) * var(--ratio) * var(--ratio));
             
-            --hub-size: 320px;
-            --orbit-size: 640px;
+            --hub-size: clamp(140px, 34vw, 320px);
+            --orbit-size: clamp(240px, 68vw, 640px);
         }
 
+        html,
         body {
             background-color: #000000;
             overflow: hidden;
             font-family: 'Satoshi', sans-serif;
             width: 100vw;
             height: 100vh;
+            max-width: 100%;
+            overscroll-behavior: none;
         }
 
         .parallax-layer {
@@ -190,6 +193,9 @@ export default function LandingPage() {
             box-shadow: 0 0 100px rgba(255, 255, 255, 0.1);
             cursor: pointer;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
         
         .hub-trigger:hover {
@@ -221,6 +227,48 @@ export default function LandingPage() {
             pointer-events: none;
             z-index: 40;
         }
+
+        @media (max-width: 640px) {
+            :root {
+                --hub-size: clamp(132px, 38vw, 160px);
+                --orbit-size: min(68vw, 260px);
+            }
+
+            .technical-overlay {
+                font-size: 0.625rem;
+            }
+
+            .hub-trigger span {
+                opacity: 1;
+                font-size: 1rem;
+            }
+
+            .scrolling-text {
+                font-size: 8px;
+                letter-spacing: 0.25em;
+            }
+        }
+
+        .landing-header {
+            padding-top: max(1.5rem, env(safe-area-inset-top));
+            padding-left: max(1.5rem, env(safe-area-inset-left));
+            padding-right: max(1.5rem, env(safe-area-inset-right));
+        }
+
+        .landing-footer {
+            padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+        }
+
+        @media (hover: none) {
+            .hub-trigger span { opacity: 1; }
+            .hub-trigger:active { transform: scale(0.97); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .orbital-text-container { animation: none; }
+            .parallax-layer,
+            .hub-trigger { transition: none; }
+        }
       `}} />
       <div 
         className="font-body text-on-surface select-none"
@@ -235,21 +283,21 @@ export default function LandingPage() {
         <div className="parallax-layer background-grid" id="parallax-grid"></div>
         
         {/* Technical Metadata Overlays */}
-        <header className="fixed top-0 w-full z-50 flex justify-between items-center bg-transparent text-white font-body tracking-widest uppercase text-ratio-xs p-14">
+        <header className="landing-header fixed top-0 w-full z-50 flex justify-between items-center gap-4 bg-transparent text-white font-body tracking-widest uppercase text-ratio-xs p-6 sm:p-10 lg:p-14">
           <div className="hero-title text-white">Q_QUEST</div>
           <div className="technical-overlay uppercase">2026 // Q_QUEST // Systems_Ready</div>
         </header>
         
-        <div className="fixed bottom-0 left-0 z-50 technical-overlay p-14">
+        <div className="fixed bottom-0 left-0 z-50 technical-overlay hidden sm:block p-10 lg:p-14">
           <div id="coords-display">[40.7128° N, 74.0060° W]</div>
         </div>
         
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 technical-overlay tracking-[0.2em] p-14">
+        <div className="landing-footer fixed bottom-0 left-1/2 -translate-x-1/2 z-50 technical-overlay tracking-[0.2em] whitespace-nowrap p-6 sm:p-10 lg:p-14">
             CALIBRATING SYSTEMS...
         </div>
         
         {/* Main Content: Central Hub with 3D Orbit */}
-        <main className="relative z-10 w-full h-screen flex items-center justify-center">
+        <main className="relative z-10 w-full h-[100dvh] min-h-[100dvh] flex items-center justify-center">
           <div className="scene">
             <div className="orbital-wrapper">
               <div className="orbital-text-container">
@@ -259,24 +307,29 @@ export default function LandingPage() {
                   </defs>
                   <text className="scrolling-text">
                     <textPath href="#orbitPath" startOffset="0%">
-                      LET'S ROCK! ★ LET'S ROCK! ★ LET'S ROCK! ★ LET'S ROCK! ★ LET'S ROCK! ★ LET'S ROCK!
+                      LET&apos;S ROCK! ★ LET&apos;S ROCK! ★ LET&apos;S ROCK! ★ LET&apos;S ROCK! ★ LET&apos;S ROCK! ★ LET&apos;S ROCK!
                     </textPath>
                   </text>
                 </svg>
               </div>
             </div>
-            <div className="hub-trigger group" onClick={handleEnter}>
+            <button
+              type="button"
+              aria-label="Enter Q-Quest"
+              className="hub-trigger group"
+              onClick={handleEnter}
+            >
               <div className="absolute inset-0 border-4 border-white/10 rounded-full scale-110 group-hover:scale-125 transition-transform duration-700"></div>
               <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-500 font-headline font-black tracking-tight text-black text-center text-[calc(var(--size-lg)_+_4px)] leading-none">ENTER<br/>The Void</span>
-            </div>
+            </button>
           </div>
         </main>
         
         {/* Decorative Corner Elements */}
-        <div className="fixed top-0 left-0 p-10 z-20 pointer-events-none opacity-30">
+        <div className="fixed top-0 left-0 p-4 sm:p-10 z-20 pointer-events-none opacity-30">
           <div className="w-24 h-24 border-t border-l border-white"></div>
         </div>
-        <div className="fixed bottom-0 left-0 p-10 z-20 pointer-events-none opacity-30">
+        <div className="fixed bottom-0 left-0 p-4 sm:p-10 z-20 pointer-events-none opacity-30">
           <div className="w-24 h-24 border-b border-l border-white"></div>
         </div>
         <div className="fixed top-0 right-0 p-10 z-20 pointer-events-none opacity-30">
