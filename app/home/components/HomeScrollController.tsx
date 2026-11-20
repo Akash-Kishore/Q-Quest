@@ -24,11 +24,13 @@ type ScrollSubscriber = (progress: number) => void;
 interface HomeScrollContextValue {
   subscribe: (fn: ScrollSubscriber) => () => void;
   reducedMotion: boolean;
+  setScrollLocked: (locked: boolean) => void;
 }
 
 const HomeScrollContext = createContext<HomeScrollContextValue | null>(null);
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+const LAUNCH_PAD_HOLD_VIEWPORTS = 1;
 
 function subscribeToReducedMotion(onChange: () => void) {
   const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -71,6 +73,11 @@ export default function HomeScrollController({ children }: HomeScrollControllerP
     };
   }, []);
 
+  const setScrollLocked = useCallback((locked: boolean) => {
+    if (locked) lenisRef.current?.stop();
+    else lenisRef.current?.start();
+  }, []);
+
   useEffect(() => {
     if (reducedMotion) {
       // Push progress = 1 so everything renders in final state
@@ -107,7 +114,14 @@ export default function HomeScrollController({ children }: HomeScrollControllerP
       pin: stage,
       scrub: 1,
       onUpdate: (self) => {
-        const p = self.progress;
+        const totalScrollDistance = Math.max(1, self.end - self.start);
+        const holdScrollDistance = window.innerHeight * LAUNCH_PAD_HOLD_VIEWPORTS;
+        const animationScrollDistance = Math.max(
+          1,
+          totalScrollDistance - holdScrollDistance
+        );
+        const travelledDistance = self.progress * totalScrollDistance;
+        const p = Math.min(1, travelledDistance / animationScrollDistance);
         subscribersRef.current.forEach((fn) => fn(p));
       },
     });
@@ -124,6 +138,7 @@ export default function HomeScrollController({ children }: HomeScrollControllerP
   const contextValue: HomeScrollContextValue = {
     subscribe,
     reducedMotion,
+    setScrollLocked,
   };
 
   return (

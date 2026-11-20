@@ -37,29 +37,35 @@ function fibSpherePoint(i: number, total: number): [number, number, number] {
 }
 
 // ---------------------------------------------------------------------------
-// PIXEL FIELD SHADERS
-// The sphere surface fractures into square fragments that disperse through
-// depth and dissolve. The pixels NEVER reform into spheres — this field is
-// transition material only and leaves the composition by ~0.92.
+// SCREEN FRACTURE SHADERS
+// The source geometry is a viewport-filling dark tile lattice. The screen
+// separates into large blocks, those blocks resolve into fine pixels, and the
+// exact same particles gather into the smaller sphere shells.
 // ---------------------------------------------------------------------------
 const PIXEL_VERT = /* glsl */ `
   precision highp float;
 
-  attribute vec3 aSpherePos;      // home position on the sphere shell
-  attribute vec3 aDrift;          // per-particle dispersal direction (varied depth)
+  attribute vec2 aScreenUv;       // -1..1 viewport lattice coordinate
+  attribute vec3 aDrift;          // block/pixel fracture momentum
   attribute float aSeed;
-  attribute float aFractureOrder; // 0..1 — drives the fracture wave across the surface
+  attribute float aFractureOrder; // 0..1 — diagonal screen-breaking wave
   attribute float aScaleVar;      // controlled size variation
+  attribute vec3 aTargetLocal;    // point on one of the reconstructed sphere shells
+  attribute vec2 aTargetCenter;   // target centre in normalized viewport space
+  attribute float aTargetRadius;
+  attribute float aCluster;
 
   uniform float uProgress;        // global scroll progress 0..1
   uniform float uTime;
   uniform float uAspect;
   uniform vec2 uMouse;            // damped, normalized -1..1
   uniform float uPixelSize;
+  uniform float uBlockSize;
 
   varying float vOpacity;
   varying float vDepth;
   varying vec3 vColor;
+  varying float vPixelPhase;
 
   float h(float n) { return fract(sin(n * 12.9898 + 78.233) * 43758.5453); }
 
@@ -73,52 +79,59 @@ const PIXEL_VERT = /* glsl */ `
   void main() {
     float g = uProgress;
 
-    // Shell fades in and crossfades with the fading SphereScene nucleus (0.66->0.72)
-    float cohere = smoothstep(0.58, 0.66, g);
+    float curtain = smoothstep(0.565, 0.615, g);
+    float fractureStart = mix(0.625, 0.715, aFractureOrder);
+    float blockDetach = smoothstep(fractureStart, fractureStart + 0.055, g);
+    float pixelPhase = smoothstep(0.705, 0.785, g);
 
-    // Fracture wave: fragments detach in a front that sweeps across the surface,
-    // beginning locally (aFractureOrder small) and propagating outward.
-    float fStart = mix(0.66, 0.77, aFractureOrder);
-    float detach = smoothstep(fStart, fStart + 0.09, g);
-
-    vec3 pos = aSpherePos;
-
-    // Pre-fracture surface shimmer (tension) while cohered and not yet detached
-    float shimmer = (1.0 - detach) * cohere;
-    pos += aDrift * 0.015 * sin(uTime * 1.6 + aSeed * 6.2831) * shimmer;
-
-    // Dispersal: outward from the sphere centre + per-particle drift + flow noise.
-    // Fragments keep a relationship to their origin as they spread (no target shape).
-    vec3 radial = normalize(aSpherePos + 1e-5);
-    float travel = detach * (0.9 + aScaleVar * 0.9);
-    pos += radial * travel * 0.55;
+    // Begin as a complete screen of large, dark square tiles. A diagonal
+    // fracture front gives the blocks staggered momentum and depth before
+    // they shrink into individual pixels.
+    vec3 pos = vec3(aScreenUv.x * uAspect, aScreenUv.y, 0.0);
+    float travel = blockDetach * (0.11 + pixelPhase * (0.30 + aScaleVar * 0.20));
     pos += aDrift * travel;
-    pos += noiseDisplace(aSeed, g * 1.8) * 0.35 * detach;
+    pos += noiseDisplace(aSeed, g * 2.1) * 0.13 * pixelPhase;
+    pos.z += (aSeed - 0.5) * 0.85 * blockDetach;
+
+    // Reassembly: the scattered fragments are pulled into multiple sphere
+    // shells. Cluster staggering makes the reconstruction read as a flowing
+    // physical transfer rather than a simultaneous shape swap.
+    float gatherStart = 0.775 + aCluster * 0.008;
+    float gather = smoothstep(gatherStart, gatherStart + 0.105, g);
+    vec3 target = vec3(aTargetCenter.x * uAspect, aTargetCenter.y, 0.0)
+                + aTargetLocal * vec3(aTargetRadius, aTargetRadius, aTargetRadius * 0.72);
+    target += aTargetLocal * sin(uTime * 1.8 + aSeed * 12.0) * 0.006 * gather;
+    pos = mix(pos, target, gather);
 
     float depth = pos.z;
 
-    // Subtle depth-weighted mouse parallax
+    // Mouse depth only becomes active after the screen has pixelated; the
+    // intact block curtain remains locked to the viewport.
     vec2 m = uMouse * vec2(uAspect, 1.0);
-    pos.xy += m * (0.018 + 0.045 * aScaleVar);
+    pos.xy += m * (0.012 + 0.030 * aScaleVar) * pixelPhase;
 
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mv;
 
-    // Fake-perspective size cue from depth (camera is orthographic)
+    // The large screen blocks visibly resolve into fine pixels before the
+    // sphere reconstruction begins.
     float depthScale = clamp(1.0 + depth * 0.35, 0.55, 1.7);
-    gl_PointSize = uPixelSize * (0.7 + aScaleVar * 0.7) * depthScale;
+    float blockSize = uBlockSize * (1.0 - blockDetach * 0.12);
+    float fineSize = uPixelSize * (0.72 + aScaleVar * 0.62) * depthScale;
+    gl_PointSize = mix(blockSize, fineSize, pixelPhase);
 
-    // Appear with the shell, then dissolve away — never reforms
-    float leave = 1.0 - smoothstep(0.82, 0.92, g);
-    float thin = 1.0 - detach * 0.15;
-    vOpacity = cohere * leave * thin;
+    float leave = 1.0 - smoothstep(0.900, 0.940, g);
+    vOpacity = curtain * leave;
 
     vDepth = depth;
+    vPixelPhase = pixelPhase;
 
-    // Restrained deep-plum -> magenta variation
+    // Near-black screen blocks become luminous plum/magenta pixels.
     float f = h(aSeed * 3.0);
-    vColor = mix(vec3(0.18, 0.05, 0.28), vec3(0.55, 0.12, 0.5), f);
-    vColor += vec3(0.06, 0.02, 0.08) * detach;
+    vec3 blockColor = mix(vec3(0.010, 0.002, 0.018), vec3(0.045, 0.008, 0.065), f);
+    vec3 pixelColor = mix(vec3(0.24, 0.045, 0.34), vec3(0.68, 0.12, 0.58), f);
+    vColor = mix(blockColor, pixelColor, pixelPhase);
+    vColor += vec3(0.08, 0.02, 0.10) * gather;
   }
 `;
 
@@ -128,11 +141,12 @@ const PIXEL_FRAG = /* glsl */ `
   varying float vOpacity;
   varying float vDepth;
   varying vec3 vColor;
+  varying float vPixelPhase;
 
   void main() {
     // Hard-edged square pixel
     vec2 uv = gl_PointCoord;
-    float margin = 0.06;
+    float margin = mix(0.035, 0.09, vPixelPhase);
     float edge = step(margin, uv.x) * step(uv.x, 1.0 - margin)
                * step(margin, uv.y) * step(uv.y, 1.0 - margin);
     if (edge < 0.5) discard;
@@ -141,7 +155,7 @@ const PIXEL_FRAG = /* glsl */ `
     float centerDist = length(uv - 0.5) * 2.0;
     float lum = 1.0 + 0.12 * (1.0 - centerDist);
 
-    float alpha = vOpacity * depthFade * 0.9;
+    float alpha = vOpacity * mix(0.985, depthFade * 0.92, vPixelPhase);
     if (alpha < 0.01) discard;
 
     gl_FragColor = vec4(vColor * lum, alpha);
@@ -149,21 +163,21 @@ const PIXEL_FRAG = /* glsl */ `
 `;
 
 // ---------------------------------------------------------------------------
-// NEW SPHERE SHADERS
-// Independent quantum objects (NOT built from the pixels). Translucent, smoky
-// internal variation, Fresnel edge, restrained glow.
+// PHYSICAL SPHERE SHADERS
+// These meshes take over at the exact reconstructed particle-shell positions,
+// adding volume, lighting and collision deformation for the gravity phase.
 // ---------------------------------------------------------------------------
 const SPHERE_VERT = /* glsl */ `
   precision highp float;
   varying vec3 vNormal;
-  varying vec3 vView;
+  varying vec3 vViewDir;
   varying vec3 vLocal;
   void main() {
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vNormal = normalize(normalMatrix * normal);
-    vec4 wp = modelMatrix * vec4(position, 1.0);
-    vView = normalize(cameraPosition - wp.xyz);
+    vViewDir = normalize(-mvPosition.xyz);
     vLocal = position; // unit-sphere local space -> stable noise under scaling
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
   }
 `;
 
@@ -176,7 +190,7 @@ const SPHERE_FRAG = /* glsl */ `
   uniform vec3 uColorB;
   uniform vec3 uGlow;
   varying vec3 vNormal;
-  varying vec3 vView;
+  varying vec3 vViewDir;
   varying vec3 vLocal;
 
   float hash31(vec3 p) {
@@ -201,12 +215,21 @@ const SPHERE_FRAG = /* glsl */ `
   }
 
   void main() {
-    float fres = pow(1.0 - max(dot(vNormal, vView), 0.0), uFresnelPower);
+    vec3 normal = normalize(vNormal);
+    vec3 viewDir = normalize(vViewDir);
+    vec3 lightDir = normalize(vec3(-0.55, 0.72, 0.85));
+    vec3 halfDir = normalize(lightDir + viewDir);
+
+    float ndv = max(dot(normal, viewDir), 0.0);
+    float diffuse = max(dot(normal, lightDir), 0.0);
+    float fres = pow(1.0 - ndv, uFresnelPower);
+    float specular = pow(max(dot(normal, halfDir), 0.0), 42.0);
     float smoke = fbm(vLocal * 2.5 + vec3(0.0, uTime * 0.06, 0.0));
     smoke = smoke * 0.5 + 0.5;
     vec3 body = mix(uColorA, uColorB, smoke);
-    vec3 col = body + uGlow * fres * 1.1;
-    float alpha = uOpacity * ((0.26 + 0.55 * fres) + smoke * 0.06);
+    vec3 litBody = body * (0.44 + diffuse * 0.68);
+    vec3 col = litBody + uGlow * fres * 0.78 + vec3(1.0, 0.78, 0.94) * specular * 0.72;
+    float alpha = uOpacity * (0.17 + 0.24 * fres + smoke * 0.028);
     alpha = clamp(alpha, 0.0, 1.0);
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
@@ -221,6 +244,7 @@ const SPHERE_FRAG = /* glsl */ `
 // ---------------------------------------------------------------------------
 interface SphereCfg {
   nx: number;          // x anchor as fraction of half-width
+  startNx?: number;    // optional assembly x before horizontal fall momentum
   floor: number;       // settle line as fraction of half-height (up = +)
   start: number;       // formation height as fraction of half-height
   r: number;           // radius as fraction of half-height
@@ -237,54 +261,73 @@ interface SphereCfg {
 
 const SPHERE_LIBRARY: SphereCfg[] = [
   {
-    nx: -0.58, floor: 0.58, start: 0.99, r: 0.20,
-    formStart: 0.80, formEnd: 0.875,
-    dropStart: 0.885, settleEnd: 1.0, dropFrac: 0.34,
-    bounceFreq: 2.0, bounceDecay: 2.4, bounceAmp: 0.16,
+    nx: -0.70, startNx: -0.30, floor: 0.58, start: 0.68, r: 0.17,
+    formStart: 0.864, formEnd: 0.908,
+    dropStart: 0.910, settleEnd: 1.0, dropFrac: 0.31,
+    bounceFreq: 1.55, bounceDecay: 2.35, bounceAmp: 0.12,
     phase: 0.0, hoverSpeed: 0.85, hoverAmp: 0.022, zHover: 0.18,
     parallax: 0.16, spin: 0.0040,
-    colorA: [0.14, 0.04, 0.22], colorB: [0.42, 0.12, 0.52], glow: [0.95, 0.15, 0.55], fresnel: 3.0,
+    colorA: [0.58, 0.30, 0.78], colorB: [0.94, 0.42, 0.73], glow: [1.0, 0.45, 0.86], fresnel: 3.0,
   },
   {
-    nx: 0.06, floor: 0.52, start: 0.96, r: 0.235,
-    formStart: 0.815, formEnd: 0.885,
-    dropStart: 0.895, settleEnd: 1.0, dropFrac: 0.34,
-    bounceFreq: 1.8, bounceDecay: 2.7, bounceAmp: 0.19,
+    nx: 0.02, startNx: -0.08, floor: -0.18, start: 0.66, r: 0.205,
+    formStart: 0.870, formEnd: 0.912,
+    dropStart: 0.914, settleEnd: 1.0, dropFrac: 0.31,
+    bounceFreq: 1.45, bounceDecay: 2.45, bounceAmp: 0.15,
     phase: 2.1, hoverSpeed: 0.7, hoverAmp: 0.026, zHover: 0.22,
     parallax: 0.20, spin: -0.0032,
-    colorA: [0.12, 0.05, 0.24], colorB: [0.50, 0.16, 0.60], glow: [0.63, 0.13, 0.94], fresnel: 2.7,
+    colorA: [0.48, 0.34, 0.82], colorB: [0.84, 0.44, 0.94], glow: [0.76, 0.50, 1.0], fresnel: 2.7,
   },
   {
-    nx: 0.62, floor: 0.60, start: 1.0, r: 0.18,
-    formStart: 0.83, formEnd: 0.90,
-    dropStart: 0.905, settleEnd: 1.0, dropFrac: 0.34,
-    bounceFreq: 2.2, bounceDecay: 2.5, bounceAmp: 0.14,
+    nx: 0.68, startNx: 0.14, floor: 0.60, start: 0.66, r: 0.155,
+    formStart: 0.876, formEnd: 0.916,
+    dropStart: 0.918, settleEnd: 1.0, dropFrac: 0.31,
+    bounceFreq: 1.65, bounceDecay: 2.35, bounceAmp: 0.10,
     phase: 4.2, hoverSpeed: 1.0, hoverAmp: 0.02, zHover: 0.16,
     parallax: 0.13, spin: 0.0036,
-    colorA: [0.15, 0.04, 0.20], colorB: [0.46, 0.13, 0.50], glow: [0.98, 0.20, 0.62], fresnel: 3.2,
+    colorA: [0.64, 0.30, 0.74], colorB: [0.96, 0.44, 0.67], glow: [1.0, 0.50, 0.78], fresnel: 3.2,
+  },
+  {
+    nx: 0.84, startNx: 0.34, floor: -0.58, start: 0.65, r: 0.11,
+    formStart: 0.882, formEnd: 0.920,
+    dropStart: 0.922, settleEnd: 1.0, dropFrac: 0.31,
+    bounceFreq: 1.75, bounceDecay: 2.55, bounceAmp: 0.08,
+    phase: 5.5, hoverSpeed: 0.9, hoverAmp: 0.016, zHover: 0.12,
+    parallax: 0.10, spin: -0.0042,
+    colorA: [0.52, 0.28, 0.72], colorB: [0.88, 0.36, 0.82], glow: [1.0, 0.42, 0.82], fresnel: 3.1,
   },
 ];
 
+const MOBILE_SPHERES: SphereCfg[] = [
+  { ...SPHERE_LIBRARY[0], startNx: -0.28, nx: -0.72, floor: 0.72, start: 0.66, r: 0.075, bounceAmp: 0.045 },
+  { ...SPHERE_LIBRARY[1], startNx: 0.0, nx: 0.78, floor: -0.35, start: 0.64, r: 0.064, bounceAmp: 0.05 },
+  { ...SPHERE_LIBRARY[2], startNx: 0.28, nx: 0.72, floor: 0.70, start: 0.64, r: 0.069, bounceAmp: 0.04 },
+];
+
 function chooseSphereConfigs(width: number): SphereCfg[] {
-  // 2 on narrow viewports, 3 otherwise — restrained, never overcrowded.
-  if (width < 640) return [SPHERE_LIBRARY[0], SPHERE_LIBRARY[2]];
+  // Four independent bodies on larger canvases, three on phones.
+  if (width < 640) return MOBILE_SPHERES;
   return SPHERE_LIBRARY;
 }
 
-// Deterministic vertical trajectory: formation hold -> accelerating fall ->
-// floor collision -> decaying bounce (restitution) -> settle. Returns a
-// fraction of half-height (up = +). Hover is added separately (time-based,
-// blended in only at the very end).
+// Deterministic vertical trajectory: formation hold -> accelerating fall to
+// the true lower viewport boundary -> energetic rebound into the launchpad ->
+// settle. Returns a fraction of half-height (up = +). Real-time free-flight
+// physics takes over only after this complete entrance choreography.
 function sphereYFraction(g: number, c: SphereCfg): number {
   const p = clamp01((g - c.dropStart) / (c.settleEnd - c.dropStart));
   if (p <= 0) return c.start;
+  const impactY = -1 + c.r;
   if (p < c.dropFrac) {
     const t = p / c.dropFrac;
-    return lerp(c.start, c.floor, t * t); // gravity: accelerating fall
+    return lerp(c.start, impactY, t * t); // gravity: accelerating fall
   }
   const u = (p - c.dropFrac) / (1 - c.dropFrac);
-  const bounce = Math.abs(Math.sin(Math.PI * c.bounceFreq * u)) * Math.exp(-c.bounceDecay * u);
-  return c.floor + bounce * c.bounceAmp;
+  const rise = u * u * (3 - 2 * u);
+  const settlingWave = Math.sin(Math.PI * u * c.bounceFreq)
+    * Math.exp(-c.bounceDecay * u)
+    * (1 - u);
+  return lerp(impactY, c.floor, rise) + settlingWave * c.bounceAmp;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,9 +349,12 @@ export default function PixelTransition() {
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
     let aspect = w / h;
 
-    // --- Adaptive particle density ---
+    // --- Adaptive screen-block lattice ---
     const area = w * h;
-    const PARTICLE_COUNT = clamp(Math.floor(area / 180), 1500, 7000);
+    const targetCount = clamp(Math.floor(area / 210), 1800, 6500);
+    const gridCols = Math.max(24, Math.round(Math.sqrt(targetCount * aspect)));
+    const gridRows = Math.max(24, Math.round(targetCount / gridCols));
+    const PARTICLE_COUNT = gridCols * gridRows;
 
     function getPixelSize(): number {
       const base = Math.min(w, h);
@@ -316,6 +362,10 @@ export default function PixelTransition() {
       if (base >= 1000) return 4.0;
       if (base >= 700) return 5.0;
       return 6.0;
+    }
+
+    function getBlockSize(): number {
+      return Math.max(w / gridCols, h / gridRows) * 1.04;
     }
 
     // --- Single renderer, two scenes (one WebGL context) ---
@@ -343,49 +393,56 @@ export default function PixelTransition() {
     const sphereScene = new THREE.Scene();
     const halfHeightWorld = Math.tan((SPH_FOV * Math.PI) / 180 / 2) * sphereCamera.position.z;
 
-    // --- Pixel geometry (sphere shell that fractures) ---
-    const LARGE_R = 0.85;
-    const spherePos = new Float32Array(PARTICLE_COUNT * 3);
+    // --- Pixel geometry (the complete viewport is the source object) ---
+    const screenUv = new Float32Array(PARTICLE_COUNT * 2);
     const drift = new Float32Array(PARTICLE_COUNT * 3);
     const seeds = new Float32Array(PARTICLE_COUNT);
     const fractureOrder = new Float32Array(PARTICLE_COUNT);
     const scaleVar = new Float32Array(PARTICLE_COUNT);
+    const targetLocal = new Float32Array(PARTICLE_COUNT * 3);
+    const targetCenter = new Float32Array(PARTICLE_COUNT * 2);
+    const targetRadius = new Float32Array(PARTICLE_COUNT);
+    const targetCluster = new Float32Array(PARTICLE_COUNT);
+    let sphereConfigs = chooseSphereConfigs(w);
 
-    // Fracture front sweeps along this direction across the surface
-    const waveDir = (() => {
-      const v = [0.62, 0.55, -0.30];
-      const len = Math.hypot(v[0], v[1], v[2]);
-      return [v[0] / len, v[1] / len, v[2] / len];
-    })();
+    function assignPixelTargets(configs: SphereCfg[]) {
+      const countPerCluster = Math.ceil(PARTICLE_COUNT / configs.length);
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const clusterIndex = i % configs.length;
+        const localIndex = Math.floor(i / configs.length);
+        const cfg = configs[clusterIndex];
+        const [tx, ty, tz] = fibSpherePoint(localIndex, countPerCluster);
+        targetLocal[i * 3] = tx;
+        targetLocal[i * 3 + 1] = ty;
+        targetLocal[i * 3 + 2] = tz;
+        targetCenter[i * 2] = cfg.startNx ?? cfg.nx;
+        targetCenter[i * 2 + 1] = cfg.start;
+        targetRadius[i] = cfg.r;
+        targetCluster[i] = clusterIndex;
+      }
+    }
+
+    assignPixelTargets(sphereConfigs);
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const [ux, uy, uz] = fibSpherePoint(i, PARTICLE_COUNT);
-      spherePos[i * 3] = ux * LARGE_R;
-      spherePos[i * 3 + 1] = uy * LARGE_R;
-      spherePos[i * 3 + 2] = uz * LARGE_R;
+      const col = i % gridCols;
+      const row = Math.floor(i / gridCols);
+      const ux = ((col + 0.5) / gridCols) * 2 - 1;
+      const uy = 1 - ((row + 0.5) / gridRows) * 2;
+      screenUv[i * 2] = ux;
+      screenUv[i * 2 + 1] = uy;
 
-      // Fracture order: projection onto the wave direction (propagating front) + jitter
-      const proj = ux * waveDir[0] + uy * waveDir[1] + uz * waveDir[2];
-      fractureOrder[i] = clamp01((proj * 0.5 + 0.5) * 0.85 + hash(i * 3.1) * 0.15);
+      // Diagonal fracture wave with restrained random variation.
+      fractureOrder[i] = clamp01((ux * 0.36 - uy * 0.24 + 0.5) * 0.82 + hash(i * 3.1) * 0.18);
 
-      // Drift direction: tangential swirl + slight outward + strong depth spread
-      const axis: [number, number, number] = Math.abs(uy) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-      let tx = uy * axis[2] - uz * axis[1];
-      let ty = uz * axis[0] - ux * axis[2];
-      let tz = ux * axis[1] - uy * axis[0];
-      const tl = Math.hypot(tx, ty, tz) || 1;
-      tx /= tl; ty /= tl; tz /= tl;
-      // bitangent = n x t
-      const bx = uy * tz - uz * ty;
-      const by = uz * tx - ux * tz;
-      const bz = ux * ty - uy * tx;
-      const a = hash(i * 9.1) * Math.PI * 2;
-      const ca = Math.cos(a), sa = Math.sin(a);
-      const swirl = 0.4 + 0.5 * hash(i * 2.3);
-      const out = 0.15 + 0.2 * hash(i * 6.7);
-      drift[i * 3] = (tx * ca + bx * sa) * swirl + ux * out;
-      drift[i * 3 + 1] = (ty * ca + by * sa) * swirl + uy * out;
-      drift[i * 3 + 2] = (tz * ca + bz * sa) * swirl + uz * out + (hash(i * 4.7) - 0.5) * 1.4;
+      const angle = hash(i * 9.1) * Math.PI * 2;
+      const radialLength = Math.hypot(ux, uy) || 1;
+      const radialX = ux / radialLength;
+      const radialY = uy / radialLength;
+      const randomWeight = 0.45 + hash(i * 4.2) * 0.40;
+      drift[i * 3] = radialX * 0.32 + Math.cos(angle) * randomWeight;
+      drift[i * 3 + 1] = radialY * 0.24 + Math.sin(angle) * randomWeight - 0.08;
+      drift[i * 3 + 2] = (hash(i * 4.7) - 0.5) * 1.35;
 
       seeds[i] = hash(i * 1.1 + 0.3);
       scaleVar[i] = hash(i * 5.7);
@@ -393,11 +450,15 @@ export default function PixelTransition() {
 
     const pixelGeom = new THREE.BufferGeometry();
     pixelGeom.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(PARTICLE_COUNT * 3), 3));
-    pixelGeom.setAttribute('aSpherePos', new THREE.Float32BufferAttribute(spherePos, 3));
+    pixelGeom.setAttribute('aScreenUv', new THREE.Float32BufferAttribute(screenUv, 2));
     pixelGeom.setAttribute('aDrift', new THREE.Float32BufferAttribute(drift, 3));
     pixelGeom.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
     pixelGeom.setAttribute('aFractureOrder', new THREE.Float32BufferAttribute(fractureOrder, 1));
     pixelGeom.setAttribute('aScaleVar', new THREE.Float32BufferAttribute(scaleVar, 1));
+    pixelGeom.setAttribute('aTargetLocal', new THREE.Float32BufferAttribute(targetLocal, 3));
+    pixelGeom.setAttribute('aTargetCenter', new THREE.Float32BufferAttribute(targetCenter, 2));
+    pixelGeom.setAttribute('aTargetRadius', new THREE.Float32BufferAttribute(targetRadius, 1));
+    pixelGeom.setAttribute('aCluster', new THREE.Float32BufferAttribute(targetCluster, 1));
 
     const pixelMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -406,6 +467,7 @@ export default function PixelTransition() {
         uAspect: { value: aspect },
         uMouse: { value: new THREE.Vector2(0, 0) },
         uPixelSize: { value: getPixelSize() * dpr },
+        uBlockSize: { value: getBlockSize() * dpr },
       },
       vertexShader: PIXEL_VERT,
       fragmentShader: PIXEL_FRAG,
@@ -417,9 +479,9 @@ export default function PixelTransition() {
     pixelScene.add(points);
 
     // --- New spheres (shared unit geometry, per-sphere material) ---
-    let sphereConfigs = chooseSphereConfigs(w);
     const sphereGeom = new THREE.SphereGeometry(1, 32, 32);
     let sphereMeshes: { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; cfg: SphereCfg }[] = [];
+    let physicsBodies: { active: boolean; x: number; y: number; vx: number; vy: number }[] = [];
 
     function buildSpheres() {
       sphereMeshes.forEach(({ mesh, mat }) => {
@@ -447,6 +509,7 @@ export default function PixelTransition() {
         sphereScene.add(mesh);
         return { mesh, mat, cfg };
       });
+      physicsBodies = sphereConfigs.map(() => ({ active: false, x: 0, y: 0, vx: 0, vy: 0 }));
     }
     buildSpheres();
 
@@ -456,11 +519,15 @@ export default function PixelTransition() {
     // --- Mouse tracking (normalized, damped) ---
     const mouseTarget = { x: 0, y: 0 };
     const mouseCurrent = { x: 0, y: 0 };
+    let mouseActive = false;
     const onMouseMove = (e: MouseEvent) => {
+      mouseActive = true;
       mouseTarget.x = (e.clientX / w) * 2 - 1;
       mouseTarget.y = -(e.clientY / h) * 2 + 1;
     };
+    const onMouseLeave = () => { mouseActive = false; };
     window.addEventListener('mousemove', onMouseMove, { passive: true });
+    window.addEventListener('mouseleave', onMouseLeave, { passive: true });
 
     // --- Responsive resize (ResizeObserver: size + DPR + density-independent layout) ---
     function applySize() {
@@ -481,10 +548,16 @@ export default function PixelTransition() {
 
       pixelMaterial.uniforms.uAspect.value = aspect;
       pixelMaterial.uniforms.uPixelSize.value = getPixelSize() * dpr;
+      pixelMaterial.uniforms.uBlockSize.value = getBlockSize() * dpr;
 
       const nextConfigs = chooseSphereConfigs(w);
       if (nextConfigs.length !== sphereConfigs.length) {
         sphereConfigs = nextConfigs;
+        assignPixelTargets(sphereConfigs);
+        pixelGeom.getAttribute('aTargetLocal').needsUpdate = true;
+        pixelGeom.getAttribute('aTargetCenter').needsUpdate = true;
+        pixelGeom.getAttribute('aTargetRadius').needsUpdate = true;
+        pixelGeom.getAttribute('aCluster').needsUpdate = true;
         buildSpheres();
       }
     }
@@ -499,11 +572,14 @@ export default function PixelTransition() {
 
     // --- Animation loop ---
     let rafId = 0;
+    let previousTime = performance.now() * 0.001;
     function animate() {
       rafId = requestAnimationFrame(animate);
 
       const g = progressRef.current;
       const time = performance.now() * 0.001;
+      const deltaTime = Math.min(1 / 30, Math.max(0, time - previousTime));
+      previousTime = time;
 
       // Only draw while the transition is on stage
       if (g < 0.56 || g > 1.02) {
@@ -522,9 +598,11 @@ export default function PixelTransition() {
 
       // New-sphere deterministic physics + presence
       const halfW = halfHeightWorld * aspect;
-      const hoverBlend = smoothstep(0.965, 1.0, g);
-      for (const s of sphereMeshes) {
+      const physicsBlend = smoothstep(0.988, 0.997, g);
+      for (let sphereIndex = 0; sphereIndex < sphereMeshes.length; sphereIndex++) {
+        const s = sphereMeshes[sphereIndex];
         const c = s.cfg;
+        const body = physicsBodies[sphereIndex];
         const emerge = easeOutCubic(smoothstep(c.formStart, c.formEnd, g));
         s.mat.uniforms.uOpacity.value = emerge;
         s.mat.uniforms.uTime.value = time;
@@ -532,18 +610,165 @@ export default function PixelTransition() {
         s.mesh.visible = true;
 
         let yf = sphereYFraction(g, c);
-        yf += Math.sin(time * c.hoverSpeed + c.phase) * c.hoverAmp * hoverBlend;
-        const xf = c.nx + Math.sin(time * c.hoverSpeed * 0.6 + c.phase + 1.0) * 0.01 * hoverBlend;
+        const dropP = clamp01((g - c.dropStart) / (c.settleEnd - c.dropStart));
+        // The cluster falls vertically first, then scatters horizontally on
+        // the rebound so its momentum reads as a single physical event.
+        const horizontalFlight = easeOutCubic(smoothstep(c.dropFrac, 0.88, dropP));
+        const deterministicX = lerp(c.startNx ?? c.nx, c.nx, horizontalFlight) * halfW;
+        const deterministicY = yf * halfHeightWorld;
+        let worldX = deterministicX + mouseCurrent.x * c.parallax * (1 - physicsBlend);
+        let worldY = deterministicY + mouseCurrent.y * c.parallax * 0.6 * (1 - physicsBlend);
+
+        // Once the scroll choreography has settled, hand each sphere to a
+        // real-time bounded body. Low-frequency forces create organic gliding;
+        // velocity integration, drag and restitution handle every edge impact.
+        if (physicsBlend > 0.001) {
+          if (!body.active) {
+            body.active = true;
+            body.x = deterministicX;
+            body.y = deterministicY;
+            body.vx = Math.sin(c.phase + 0.8) * 0.24;
+            body.vy = Math.cos(c.phase + 0.35) * 0.18;
+          }
+
+          const radius = c.r * halfHeightWorld;
+          // Two incommensurate waves per axis keep every body wandering on a
+          // distinct, non-repeating-looking path instead of sharing an orbit.
+          const accelerationX =
+            Math.sin(time * (0.31 + c.hoverSpeed * 0.13) + c.phase) * 0.052 +
+            Math.cos(time * (0.19 + c.hoverSpeed * 0.07) + c.phase * 1.71) * 0.031;
+          const accelerationY =
+            Math.cos(time * (0.27 + c.hoverSpeed * 0.11) + c.phase * 1.3) * 0.048 +
+            Math.sin(time * (0.17 + c.hoverSpeed * 0.08) + c.phase * 2.03) * 0.029;
+          body.vx += accelerationX * deltaTime;
+          body.vy += accelerationY * deltaTime;
+
+          // Cursor-to-sphere repulsion. The force rises quadratically only
+          // inside the sphere's local influence radius, like a soft magnet.
+          if (mouseActive) {
+            const mouseWorldX = mouseCurrent.x * halfW;
+            const mouseWorldY = mouseCurrent.y * halfHeightWorld;
+            const repelX = body.x - mouseWorldX;
+            const repelY = body.y - mouseWorldY;
+            const repelDistance = Math.hypot(repelX, repelY) || 0.0001;
+            const repelRadius = radius * 2.15 + 0.32;
+            if (repelDistance < repelRadius) {
+              const influence = 1 - repelDistance / repelRadius;
+              const force = influence * influence * 2.35;
+              body.vx += (repelX / repelDistance) * force * deltaTime;
+              body.vy += (repelY / repelDistance) * force * deltaTime;
+            }
+          }
+
+          const drag = Math.pow(0.998, deltaTime * 60);
+          body.vx *= drag;
+          body.vy *= drag;
+          const speed = Math.hypot(body.vx, body.vy);
+          const maxSpeed = 0.38;
+          if (speed > maxSpeed) {
+            body.vx = (body.vx / speed) * maxSpeed;
+            body.vy = (body.vy / speed) * maxSpeed;
+          }
+
+          body.x += body.vx * deltaTime;
+          body.y += body.vy * deltaTime;
+
+          const minX = -halfW + radius;
+          const maxX = halfW - radius;
+          const minY = -halfHeightWorld + radius;
+          const maxY = halfHeightWorld - radius;
+          if (body.x < minX) { body.x = minX; body.vx = Math.abs(body.vx) * 0.94; }
+          if (body.x > maxX) { body.x = maxX; body.vx = -Math.abs(body.vx) * 0.94; }
+          if (body.y < minY) { body.y = minY; body.vy = Math.abs(body.vy) * 0.92; }
+          if (body.y > maxY) { body.y = maxY; body.vy = -Math.abs(body.vy) * 0.92; }
+
+          worldX = lerp(deterministicX, body.x, physicsBlend);
+          worldY = lerp(deterministicY, body.y, physicsBlend);
+        } else {
+          body.active = false;
+        }
 
         s.mesh.position.set(
-          xf * halfW + mouseCurrent.x * c.parallax,
-          yf * halfHeightWorld + mouseCurrent.y * c.parallax * 0.6,
-          Math.sin(time * 0.5 + c.phase) * c.zHover * hoverBlend
+          worldX,
+          worldY,
+          Math.sin(time * 0.5 + c.phase) * c.zHover * physicsBlend
         );
-        s.mesh.scale.setScalar(c.r * halfHeightWorld * emerge);
+        const baseScale = c.r * halfHeightWorld * emerge;
+        // Uniform scaling keeps the projected silhouette perfectly circular.
+        s.mesh.scale.setScalar(baseScale);
         s.mesh.rotation.y += c.spin;
         s.mesh.rotation.x = mouseCurrent.y * 0.15;
         s.mesh.rotation.z = mouseCurrent.x * 0.10;
+      }
+
+      // Resolve sphere-to-sphere contacts after every body has integrated.
+      // Radius-squared mass gives the larger glass bodies believable weight;
+      // positional correction prevents slow overlaps from accumulating.
+      for (let aIndex = 0; aIndex < physicsBodies.length; aIndex++) {
+        const a = physicsBodies[aIndex];
+        if (!a.active) continue;
+        for (let bIndex = aIndex + 1; bIndex < physicsBodies.length; bIndex++) {
+          const b = physicsBodies[bIndex];
+          if (!b.active) continue;
+
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const minDistance = (sphereConfigs[aIndex].r + sphereConfigs[bIndex].r) * halfHeightWorld;
+          const distanceSquared = dx * dx + dy * dy;
+          if (distanceSquared >= minDistance * minDistance) continue;
+
+          const distance = Math.sqrt(distanceSquared) || 0.0001;
+          const nx = dx / distance;
+          const ny = dy / distance;
+          const overlap = minDistance - distance;
+          const massA = sphereConfigs[aIndex].r * sphereConfigs[aIndex].r;
+          const massB = sphereConfigs[bIndex].r * sphereConfigs[bIndex].r;
+          const totalMass = massA + massB;
+
+          a.x -= nx * overlap * (massB / totalMass);
+          a.y -= ny * overlap * (massB / totalMass);
+          b.x += nx * overlap * (massA / totalMass);
+          b.y += ny * overlap * (massA / totalMass);
+
+          const relativeNormalVelocity = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+          if (relativeNormalVelocity < 0) {
+            const restitution = 0.88;
+            const impulse = -(1 + restitution) * relativeNormalVelocity / (1 / massA + 1 / massB);
+            const impulseX = impulse * nx;
+            const impulseY = impulse * ny;
+            a.vx -= impulseX / massA;
+            a.vy -= impulseY / massA;
+            b.vx += impulseX / massB;
+            b.vy += impulseY / massB;
+          }
+        }
+      }
+
+      // Pair separation can nudge a sphere past a wall, so finish with a
+      // second boundary constraint to guarantee every body remains visible.
+      for (let bodyIndex = 0; bodyIndex < physicsBodies.length; bodyIndex++) {
+        const body = physicsBodies[bodyIndex];
+        if (!body.active) continue;
+        const radius = sphereConfigs[bodyIndex].r * halfHeightWorld;
+        const minX = -halfW + radius;
+        const maxX = halfW - radius;
+        const minY = -halfHeightWorld + radius;
+        const maxY = halfHeightWorld - radius;
+        if (body.x < minX) { body.x = minX; body.vx = Math.abs(body.vx) * 0.94; }
+        if (body.x > maxX) { body.x = maxX; body.vx = -Math.abs(body.vx) * 0.94; }
+        if (body.y < minY) { body.y = minY; body.vy = Math.abs(body.vy) * 0.92; }
+        if (body.y > maxY) { body.y = maxY; body.vy = -Math.abs(body.vy) * 0.92; }
+      }
+
+      // Apply any pair-collision correction to the rendered bodies. The blend
+      // preserves a seamless handoff from scroll choreography to free motion.
+      if (physicsBlend > 0.001) {
+        sphereMeshes.forEach((sphere, index) => {
+          const body = physicsBodies[index];
+          if (!body.active || !sphere.mesh.visible) return;
+          sphere.mesh.position.x = lerp(sphere.mesh.position.x, body.x, physicsBlend);
+          sphere.mesh.position.y = lerp(sphere.mesh.position.y, body.y, physicsBlend);
+        });
       }
 
       // Composite: spheres behind, dissolving pixel field in front
@@ -559,6 +784,7 @@ export default function PixelTransition() {
       unsub();
       ro.disconnect();
       window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseleave', onMouseLeave);
 
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

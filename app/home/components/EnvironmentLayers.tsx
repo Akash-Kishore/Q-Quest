@@ -46,16 +46,18 @@ function lerpRgb(a: RGB, b: RGB, t: number): RGB {
   };
 }
 
-// Dark space → atmospheric evolution → pastel aurora
+// Dark space → atmospheric evolution → dark aurora. The launchpad remains in
+// the same violet/magenta world as the opening Q-Quest scene so the pixel
+// reconstruction feels like one continuous environment, not a theme swap.
 // Each stop is a progress threshold and corresponding base color
 const ATMOSPHERE_STOPS: { p: number; color: RGB }[] = [
   { p: 0.00, color: hexToRgb('#050005') },
   { p: 0.55, color: hexToRgb('#050005') },
   { p: 0.68, color: hexToRgb('#050005') }, // held dark through pixel transition start
-  { p: 0.78, color: hexToRgb('#0a0010') }, // barely perceptible — pixel curtain active
-  { p: 0.84, color: hexToRgb('#3a1060') }, // curtain opening, light world emerging
-  { p: 0.88, color: hexToRgb('#9a60c0') },
-  { p: 0.92, color: hexToRgb('#eadaf5') }, // full pastel
+  { p: 0.80, color: hexToRgb('#0a0010') }, // barely perceptible — pixel curtain active
+  { p: 0.88, color: hexToRgb('#170322') }, // reconstructed spheres remain in the void
+  { p: 0.92, color: hexToRgb('#220632') },
+  { p: 0.96, color: hexToRgb('#12001d') }, // launchpad resolves into a dark aurora
 ];
 
 function getAtmosphereColor(progress: number): RGB {
@@ -84,7 +86,7 @@ export default function EnvironmentLayers() {
 
   useEffect(() => {
     if (reducedMotion) {
-      // Show final light state
+      // Show the final dark-aurora state without animated movement.
       if (voidRef.current) voidRef.current.style.display = 'none';
       if (starsRef.current) starsRef.current.style.opacity = '0';
       if (nebulaRef.current) nebulaRef.current.style.opacity = '0';
@@ -98,12 +100,15 @@ export default function EnvironmentLayers() {
       // ---- Space void base color ----
       if (voidRef.current) {
         const baseColor = getAtmosphereColor(progress);
-        // Purple and pink radials that intensify during fracture then fade
+        // The zoom resolves into a genuinely dark block curtain. The earlier
+        // nebula illumination recedes before the screen begins fracturing.
         const radialIntensity = progress < 0.55
           ? 0.35
-          : progress < 0.75
-            ? lerp(0.35, 0.6, rangeProgress(progress, 0.55, 0.75))
-            : lerp(0.6, 0.0, rangeProgress(progress, 0.75, 0.92));
+          : progress < 0.64
+            ? lerp(0.35, 0.035, rangeProgress(progress, 0.55, 0.64))
+            : progress < 0.90
+              ? 0.035
+              : lerp(0.035, 0.10, rangeProgress(progress, 0.90, 0.96));
 
         const purpleRadial = `rgba(160, 32, 240, ${radialIntensity})`;
         const pinkRadial = `rgba(255, 20, 147, ${radialIntensity * 0.8})`;
@@ -156,19 +161,19 @@ export default function EnvironmentLayers() {
         vignetteRef.current.style.opacity = `${vigOpacity}`;
       }
 
-      // ---- Aurora gradient ----
+      // ---- Dark aurora gradient ----
       if (auroraRef.current) {
-        const auroraOpacity = progress < 0.84
+        const auroraOpacity = progress < 0.90
           ? 0
-          : rangeProgress(progress, 0.84, 0.92);
+          : rangeProgress(progress, 0.90, 0.985);
         auroraRef.current.style.opacity = `${auroraOpacity}`;
       }
 
       // ---- Paper grain ----
       if (grainRef.current) {
-        const grainOpacity = progress < 0.88
+        const grainOpacity = progress < 0.94
           ? 0
-          : lerp(0, 0.06, rangeProgress(progress, 0.88, 0.95));
+          : lerp(0, 0.06, rangeProgress(progress, 0.94, 0.99));
         grainRef.current.style.opacity = `${grainOpacity}`;
       }
     });

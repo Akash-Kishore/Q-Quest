@@ -1,0 +1,164 @@
+.page {
+  --ink: #111012;
+  --paper: #f1efe9;
+  --violet: #7746c7;
+  --line: rgba(17, 16, 18, 0.2);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: 'Satoshi', 'Outfit', sans-serif;
+}
+
+.nav {
+  min-height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1rem clamp(1.25rem, 4vw, 4.5rem);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brandMark {
+  --brand-highlight-x: 50%;
+  --brand-highlight-y: 50%;
+  position: relative;
+  width: 3.2rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #fff;
+  background: #18151d;
+  border-radius: 50%;
+  box-shadow: 0 0.45rem 0 #b89be3;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.brandMark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(circle 1.9rem at var(--brand-highlight-x) var(--brand-highlight-y), rgba(255,255,255,0.5), transparent 72%);
+  transition: opacity 160ms ease;
+}
+
+.brandMark svg { width: 58%; position: relative; z-index: 1; }
+.brandLabel { font: 800 1rem/1 'Cabinet Grotesk', sans-serif; }
+.brand[data-pointer-active='true'] .brandMark { transform: translateY(-2px); box-shadow: 0 0.7rem 0 #9b79d2; }
+.brand[data-pointer-active='true'] .brandMark::after { opacity: 1; }
+.brand[data-pointer-active='true'] .brandLabel { color: var(--violet); }
+
+.navLinks { display: flex; align-items: center; gap: clamp(1rem, 3vw, 2.75rem); }
+.navLinks a { color: inherit; font-weight: 700; text-decoration: none; transition: color 160ms ease; }
+.navLinks a:hover { color: var(--violet); }
+
+.resource {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-height: calc(100svh - 12rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(5rem, 10vw, 10rem) clamp(1.25rem, 6vw, 7rem);
+  background: #e8e1eb;
+}
+
+.grid {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: 0.45;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: min(25vw, 24rem) min(25vw, 24rem);
+  mask-image: linear-gradient(90deg, #000, transparent 88%);
+}
+
+.resource > span {
+  color: var(--violet);
+  font: 700 0.68rem/1.4 'JetBrains Mono', monospace;
+  letter-spacing: 0.14em;
+}
+
+.resource h1 {
+  max-width: 70rem;
+  margin: 2rem 0 0;
+  font: 900 clamp(4.25rem, 9.5vw, 10rem)/0.8 'Cabinet Grotesk', sans-serif;
+  letter-spacing: -0.07em;
+}
+
+.resource p {
+  max-width: 38rem;
+  margin: 2rem 0;
+  color: rgba(17,16,18,0.66);
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+  line-height: 1.65;
+}
+
+.resource > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.7rem;
+  padding: 0.85rem 1.25rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  color: #fff;
+  background: var(--ink);
+  font-weight: 800;
+  text-decoration: none;
+  transition: color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.resource > a:hover {
+  color: var(--ink);
+  background: transparent;
+  transform: translateY(-3px);
+}
+
+.footer {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 2rem;
+  align-items: end;
+  padding: 2rem clamp(1.25rem, 4vw, 4.5rem);
+  color: rgba(255,255,255,0.58);
+  background: #0c080e;
+  border-top: 1px solid rgba(255,255,255,0.14);
+  font: 600 0.68rem/1.4 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.footer strong { color: #fff; font: 800 1.8rem/1 'Cabinet Grotesk', sans-serif; text-transform: none; letter-spacing: -0.02em; }
+
+@media (max-width: 620px) {
+  .nav { min-height: 5rem; }
+  .brandMark { width: 2.7rem; }
+  .brandLabel { display: none; }
+  .navLinks { gap: 1rem; font-size: 0.82rem; }
+  .resource h1 { font-size: clamp(3.7rem, 17vw, 6rem); }
+  .footer { grid-template-columns: 1fr; align-items: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brandMark,
+  .resource > a { transition: none; }
+}

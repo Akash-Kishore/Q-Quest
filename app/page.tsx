@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function LandingPage() {
@@ -202,6 +203,13 @@ export default function LandingPage() {
             transform: scale(1.02);
         }
 
+        .enter-label {
+            font-family: 'Cabinet Grotesk', sans-serif;
+            font-weight: 900;
+            letter-spacing: -0.055em;
+            -webkit-text-stroke: 0.35px currentColor;
+            text-shadow: 0 0 0 currentColor;
+        }
 
 
         .scrolling-text {
@@ -250,9 +258,98 @@ export default function LandingPage() {
         }
 
         .landing-header {
-            padding-top: max(1.5rem, env(safe-area-inset-top));
-            padding-left: max(1.5rem, env(safe-area-inset-left));
-            padding-right: max(1.5rem, env(safe-area-inset-right));
+            position: fixed;
+            inset: 0 0 auto;
+            z-index: 50;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding-top: max(1rem, env(safe-area-inset-top));
+            padding-left: max(1rem, env(safe-area-inset-left));
+            padding-right: max(1rem, env(safe-area-inset-right));
+            color: white;
+            pointer-events: none;
+        }
+
+        .corner-label {
+            position: relative;
+            width: min(42vw, 24rem);
+            height: clamp(4.5rem, 7vw, 7rem);
+            box-sizing: border-box;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: flex-start;
+            padding-top: clamp(0.55rem, 1vw, 0.9rem);
+            color: inherit;
+            text-decoration: none;
+            pointer-events: auto;
+        }
+
+        .corner-label::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 1px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .corner-label-left {
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            padding-left: clamp(0.65rem, 1vw, 1rem);
+        }
+
+        .corner-label-left::after {
+            left: 0;
+        }
+
+        .corner-label-right {
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+            justify-content: flex-end;
+            padding-right: clamp(0.65rem, 1vw, 1rem);
+            text-align: right;
+        }
+
+        .corner-label-right::after {
+            right: 0;
+        }
+
+        @media (min-width: 640px) {
+            .landing-header {
+                padding-top: max(2.5rem, env(safe-area-inset-top));
+                padding-left: max(2.5rem, env(safe-area-inset-left));
+                padding-right: max(2.5rem, env(safe-area-inset-right));
+            }
+        }
+
+        @media (max-width: 480px) {
+            .corner-label-right .technical-overlay {
+                font-size: 0.4rem;
+                letter-spacing: 0.045em;
+            }
+        }
+
+        .landing-corner {
+            position: fixed;
+            bottom: max(1rem, env(safe-area-inset-bottom));
+            z-index: 20;
+            width: clamp(3.5rem, 8vw, 6rem);
+            height: clamp(3.5rem, 8vw, 6rem);
+            pointer-events: none;
+            opacity: 0.3;
+        }
+
+        .landing-corner-left {
+            left: max(1rem, env(safe-area-inset-left));
+            border-bottom: 1px solid white;
+            border-left: 1px solid white;
+        }
+
+        .landing-corner-right {
+            right: max(1rem, env(safe-area-inset-right));
+            border-bottom: 1px solid white;
+            border-right: 1px solid white;
         }
 
         .landing-footer {
@@ -283,9 +380,13 @@ export default function LandingPage() {
         <div className="parallax-layer background-grid" id="parallax-grid"></div>
         
         {/* Technical Metadata Overlays */}
-        <header className="landing-header fixed top-0 w-full z-50 flex justify-between items-center gap-4 bg-transparent text-white font-body tracking-widest uppercase text-ratio-xs p-6 sm:p-10 lg:p-14">
-          <div className="hero-title text-white">Q_QUEST</div>
-          <div className="technical-overlay uppercase">2026 // Q_QUEST // Systems_Ready</div>
+        <header className="landing-header font-body tracking-widest uppercase">
+          <Link href="/home" className="corner-label corner-label-left" aria-label="Go to Q-Quest home">
+            <div className="hero-title text-white">Q_QUEST</div>
+          </Link>
+          <div className="corner-label corner-label-right">
+            <div className="technical-overlay uppercase whitespace-nowrap">2026 // Q_QUEST // Systems_Ready</div>
+          </div>
         </header>
         
         <div className="fixed bottom-0 left-0 z-50 technical-overlay hidden sm:block p-10 lg:p-14">
@@ -320,24 +421,14 @@ export default function LandingPage() {
               onClick={handleEnter}
             >
               <div className="absolute inset-0 border-4 border-white/10 rounded-full scale-110 group-hover:scale-125 transition-transform duration-700"></div>
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-500 font-headline font-black tracking-tight text-black text-center text-[calc(var(--size-lg)_+_4px)] leading-none">ENTER<br/>The Void</span>
+              <span className="enter-label opacity-0 group-hover:opacity-100 transition-opacity duration-500 text-black text-center text-[calc(var(--size-lg)_+_4px)] leading-none">ENTER<br/>The Void</span>
             </button>
           </div>
         </main>
         
         {/* Decorative Corner Elements */}
-        <div className="fixed top-0 left-0 p-4 sm:p-10 z-20 pointer-events-none opacity-30">
-          <div className="w-24 h-24 border-t border-l border-white"></div>
-        </div>
-        <div className="fixed bottom-0 left-0 p-4 sm:p-10 z-20 pointer-events-none opacity-30">
-          <div className="w-24 h-24 border-b border-l border-white"></div>
-        </div>
-        <div className="fixed top-0 right-0 p-10 z-20 pointer-events-none opacity-30">
-          <div className="w-24 h-24 border-t border-r border-white"></div>
-        </div>
-        <div className="fixed bottom-0 right-0 p-10 z-20 pointer-events-none opacity-30">
-          <div className="w-24 h-24 border-b border-r border-white"></div>
-        </div>
+        <div className="landing-corner landing-corner-left" />
+        <div className="landing-corner landing-corner-right" />
       </div>
     </>
   );

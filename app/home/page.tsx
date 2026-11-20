@@ -7,30 +7,38 @@ import SphereScene from './components/SphereScene';
 import PixelTransition from './components/PixelTransition';
 import HeroTitle from './components/HeroTitle';
 import SelectionReveal from './components/SelectionReveal';
+import CursorGlow from './components/CursorGlow';
+import AboutTeaser from './components/AboutTeaser';
 import styles from './home.module.css';
 
 export default function HomePage() {
   return (
-    <HomeScrollController>
-      <div className={styles.homePage}>
-        {/* Layer 0–5: Environment (dark space → atmospheric evolution → aurora) */}
-        <EnvironmentLayers />
+    <main className={styles.homeDocument}>
+      <HomeScrollController>
+        <div className={styles.homePage}>
+          {/* Layer 0–5: Environment (dark space → atmospheric evolution → aurora) */}
+          <EnvironmentLayers />
 
-        {/* Layer 6: HUD Grid (participates in transition, dissolves by 0.70) */}
-        <HudGrid />
+          {/* Layer 6: HUD Grid (participates in transition, dissolves by 0.70) */}
+          <HudGrid />
 
-        {/* Layer 10: Three.js sphere + orbits + camera choreography */}
-        <SphereScene />
+          {/* Layer 10: Three.js sphere + orbits + camera choreography */}
+          <SphereScene />
 
-        {/* Layer 15: Q_QUEST typography (spatial exit, never fades) */}
-        <HeroTitle />
+          {/* Layer 15: Q_QUEST typography (spatial exit, never fades) */}
+          <HeroTitle />
 
-        {/* Layer 18: Selection reveal (title + cards) */}
-        <SelectionReveal />
+          {/* Layer 18: Selection reveal (title + cards) */}
+          <SelectionReveal />
 
-        {/* Layer 19: WebGL pixel transition (sphere → disintegrate → reform → physics → hover) */}
-        <PixelTransition />
-      </div>
-    </HomeScrollController>
+          {/* Layer 19: WebGL pixel transition (sphere → disintegrate → reform → physics → hover) */}
+          <PixelTransition />
+
+          {/* Pointer-only ambient light; hidden for touch and reduced motion. */}
+          <CursorGlow />
+        </div>
+      </HomeScrollController>
+      <AboutTeaser />
+    </main>
   );
 }

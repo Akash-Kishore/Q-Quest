@@ -1,8 +1,10 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import AtomLogo from '@/components/AtomLogo';
 import { useHomeScroll } from './HomeScrollController';
 import styles from '../home.module.css';
 
@@ -25,64 +27,40 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
-// ---------------------------------------------------------------------------
-// 3D card tilt hook
-// ---------------------------------------------------------------------------
-function useCardTilt(maxAngle: number = 5, enabled: boolean = true) {
-  const cardRef = useRef<HTMLButtonElement>(null);
-  const rafId = useRef(0);
-  const current = useRef({ rx: 0, ry: 0 });
-  const target = useRef({ rx: 0, ry: 0 });
+type LaunchCardKey = 'circuit' | 'research';
 
-  const animate = useCallback(function updateTilt() {
-    current.current.rx += (target.current.rx - current.current.rx) * 0.1;
-    current.current.ry += (target.current.ry - current.current.ry) * 0.1;
-
-    const card = cardRef.current;
-    if (card) {
-      card.style.transform = `perspective(800px) rotateX(${current.current.rx}deg) rotateY(${current.current.ry}deg)`;
-    }
-
-    const stillMoving =
-      Math.abs(target.current.rx - current.current.rx) > 0.01 ||
-      Math.abs(target.current.ry - current.current.ry) > 0.01;
-    rafId.current = stillMoving ? requestAnimationFrame(updateTilt) : 0;
-  }, []);
-
-  const requestTiltFrame = useCallback(() => {
-    if (enabled && rafId.current === 0) {
-      rafId.current = requestAnimationFrame(animate);
-    }
-  }, [animate, enabled]);
-
-  const handleMove = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!enabled) return;
-      const card = cardRef.current;
-      if (!card) return;
-      const rect = card.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const nx = (e.clientX - cx) / (rect.width / 2);
-      const ny = (e.clientY - cy) / (rect.height / 2);
-      target.current = { rx: -ny * maxAngle, ry: nx * maxAngle };
-      requestTiltFrame();
-    },
-    [enabled, maxAngle, requestTiltFrame]
-  );
-
-  const handleLeave = useCallback(() => {
-    target.current = { rx: 0, ry: 0 };
-    requestTiltFrame();
-  }, [requestTiltFrame]);
-
-  useEffect(() => {
-    if (!enabled) cancelAnimationFrame(rafId.current);
-    return () => cancelAnimationFrame(rafId.current);
-  }, [enabled]);
-
-  return { cardRef, handleMove, handleLeave };
-}
+const LAUNCH_CARDS = {
+  circuit: {
+    title: 'Circuit Playground',
+    role: 'Quantum Builder',
+    code: 'EXPERIMENTAL-014',
+    rank: '01',
+    route: '/sandbox/circuit',
+    image: '/images/launchpad/circuit-playground-sketch.png',
+    description: 'Build circuits gate by gate, watch every state-vector transformation, and inspect the matrices behind the quantum action. This is the hands-on laboratory for fearless experiments.',
+    stats: [
+      ['Qubits', '05'],
+      ['Gate set', '20+'],
+      ['Matrices', 'LIVE'],
+      ['Difficulty', 'ADAPTIVE'],
+    ],
+  },
+  research: {
+    title: 'Quantum Resources',
+    role: 'Knowledge Library',
+    code: 'ARCHIVE-LOG',
+    rank: '02',
+    route: '/sandbox/research',
+    image: '/images/launchpad/research-vault-sketch.png',
+    description: 'Enter a curated field archive of quantum ideas, practical explainers, and Beyond the Bit dispatches. Follow a concept from first intuition to a research-ready understanding.',
+    stats: [
+      ['Archive', 'LIVE'],
+      ['Topics', 'CURATED'],
+      ['Reading', 'FOCUSED'],
+      ['Updates', 'FRESH'],
+    ],
+  },
+} as const;
 
 // ---------------------------------------------------------------------------
 // SelectionReveal — Launch Pad emerges behind the dissolving pixel field.
@@ -90,8 +68,14 @@ function useCardTilt(maxAngle: number = 5, enabled: boolean = true) {
 // then label / subtitle / cards reveal in sequence. No premature cards.
 // ---------------------------------------------------------------------------
 export default function SelectionReveal() {
-  const { subscribe, reducedMotion } = useHomeScroll();
+  const { subscribe, reducedMotion, setScrollLocked } = useHomeScroll();
   const router = useRouter();
+  const [selectedCard, setSelectedCard] = useState<LaunchCardKey | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [launching, setLaunching] = useState<LaunchCardKey | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const launchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const layerRef = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLSpanElement>(null);
@@ -99,22 +83,153 @@ export default function SelectionReveal() {
   const subtitleRef = useRef<HTMLParagraphElement>(null);
   const card1WrapRef = useRef<HTMLDivElement>(null);
   const card2WrapRef = useRef<HTMLDivElement>(null);
+  const cardPointerFrameRef = useRef<number | null>(null);
   const interactiveRef = useRef(false);
 
   // Max cinematic scale for the title, measured from actual text bounds vs the
   // safe viewport region so the oversized initial state can never clip.
   const titleMaxScale = useRef(1);
 
-  const {
-    cardRef: card1Ref,
-    handleMove: handleCard1Move,
-    handleLeave: handleCard1Leave,
-  } = useCardTilt(5, !reducedMotion);
-  const {
-    cardRef: card2Ref,
-    handleMove: handleCard2Move,
-    handleLeave: handleCard2Leave,
-  } = useCardTilt(5, !reducedMotion);
+  const resetCardMotion = useCallback((card: HTMLButtonElement | null) => {
+    if (cardPointerFrameRef.current !== null) {
+      cancelAnimationFrame(cardPointerFrameRef.current);
+      cardPointerFrameRef.current = null;
+    }
+    if (!card) return;
+    card.style.setProperty('--card-rotate-x', '0deg');
+    card.style.setProperty('--card-rotate-y', '0deg');
+    card.style.setProperty('--card-shift-x', '0px');
+    card.style.setProperty('--card-shift-y', '0px');
+    card.style.setProperty('--card-image-x', '0px');
+    card.style.setProperty('--card-image-y', '0px');
+    card.style.setProperty('--card-glow-x', '50%');
+    card.style.setProperty('--card-glow-y', '50%');
+    card.removeAttribute('data-pointer-active');
+  }, []);
+
+  const handleCardPointerMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const card = event.currentTarget;
+    if (
+      selectedCard
+      || reducedMotion
+      || event.pointerType === 'touch'
+      || !window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    ) {
+      resetCardMotion(card);
+      return;
+    }
+
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    if (cardPointerFrameRef.current !== null) {
+      cancelAnimationFrame(cardPointerFrameRef.current);
+    }
+    cardPointerFrameRef.current = requestAnimationFrame(() => {
+      cardPointerFrameRef.current = null;
+      const bounds = card.getBoundingClientRect();
+      const x = Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width));
+      const y = Math.max(0, Math.min(1, (clientY - bounds.top) / bounds.height));
+      const horizontal = (x - 0.5) * 2;
+      const vertical = (y - 0.5) * 2;
+
+      card.style.setProperty('--card-rotate-x', `${(-vertical * 4).toFixed(2)}deg`);
+      card.style.setProperty('--card-rotate-y', `${(horizontal * 5).toFixed(2)}deg`);
+      card.style.setProperty('--card-shift-x', `${(horizontal * 3).toFixed(2)}px`);
+      card.style.setProperty('--card-shift-y', `${(vertical * 3).toFixed(2)}px`);
+      card.style.setProperty('--card-image-x', `${(-horizontal * 6).toFixed(2)}px`);
+      card.style.setProperty('--card-image-y', `${(-vertical * 6).toFixed(2)}px`);
+      card.style.setProperty('--card-glow-x', `${(x * 100).toFixed(1)}%`);
+      card.style.setProperty('--card-glow-y', `${(y * 100).toFixed(1)}%`);
+      card.setAttribute('data-pointer-active', 'true');
+    });
+  }, [reducedMotion, resetCardMotion, selectedCard]);
+
+  const openDetails = useCallback((card: LaunchCardKey) => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+    setIsClosing(false);
+    setSelectedCard(card);
+  }, []);
+
+  const closeDetails = useCallback(() => {
+    if (closeTimerRef.current) return;
+    if (reducedMotion) {
+      setSelectedCard(null);
+      return;
+    }
+    setIsClosing(true);
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      setSelectedCard(null);
+      setIsClosing(false);
+    }, 580);
+  }, [reducedMotion]);
+
+  const launchDestination = useCallback((destination: LaunchCardKey) => {
+    if (launchTimerRef.current) return;
+    setLaunching(destination);
+    setScrollLocked(true);
+    launchTimerRef.current = setTimeout(() => {
+      router.push(LAUNCH_CARDS[destination].route);
+    }, reducedMotion ? 160 : 1150);
+  }, [reducedMotion, router, setScrollLocked]);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    if (launchTimerRef.current) clearTimeout(launchTimerRef.current);
+    if (cardPointerFrameRef.current !== null) {
+      cancelAnimationFrame(cardPointerFrameRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCard) return;
+    [card1WrapRef.current, card2WrapRef.current].forEach((wrapper) => {
+      resetCardMotion(wrapper?.querySelector('button') ?? null);
+    });
+  }, [resetCardMotion, selectedCard]);
+
+  useEffect(() => {
+    router.prefetch(LAUNCH_CARDS.circuit.route);
+    router.prefetch(LAUNCH_CARDS.research.route);
+  }, [router]);
+
+  useEffect(() => {
+    if (!selectedCard) return;
+    const html = document.documentElement;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+    const lockedScrollY = window.scrollY;
+    const holdTimelinePosition = () => {
+      if (Math.abs(window.scrollY - lockedScrollY) > 1) {
+        window.scrollTo({ top: lockedScrollY, behavior: 'instant' });
+      }
+    };
+    window.addEventListener('scroll', holdTimelinePosition, { passive: true });
+    setScrollLocked(true);
+    html.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeDetails();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const focusFrame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('scroll', holdTimelinePosition);
+      html.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
+      setScrollLocked(false);
+      previouslyFocused?.focus();
+    };
+  }, [closeDetails, selectedCard, setScrollLocked]);
 
   useEffect(() => {
     const measureTitleScale = () => {
@@ -159,45 +274,46 @@ export default function SelectionReveal() {
     }
 
     const unsub = subscribe((g: number) => {
-      // Layer becomes visible as the pixel field starts thinning
+      // Reveal the light-world interface only after the dark screen has
+      // broken into pixels and rebuilt into the sphere shells.
       if (layerRef.current) {
-        layerRef.current.style.visibility = g > 0.70 ? 'visible' : 'hidden';
+        layerRef.current.style.visibility = g > 0.912 ? 'visible' : 'hidden';
       }
 
-      // --- Title: oversized cinematic settle (scale + rise + fade), 0.74–0.865 ---
+      // --- Title: oversized cinematic settle after reconstruction, 0.915–0.948 ---
       if (titleRef.current) {
-        const t = easeOutCubic(rangeProgress(g, 0.74, 0.865));
+        const t = easeOutCubic(rangeProgress(g, 0.915, 0.948));
         const scale = lerp(titleMaxScale.current, 1, t);
         const y = lerp(34, 0, t);
         titleRef.current.style.transform = `translateY(${y}px) scale(${scale})`;
         titleRef.current.style.opacity = String(Math.min(1, t * 1.4));
       }
 
-      // --- System label: 0.84–0.91 ---
+      // --- System label: 0.938–0.965 ---
       if (labelRef.current) {
-        const t = easeOutCubic(rangeProgress(g, 0.84, 0.91));
+        const t = easeOutCubic(rangeProgress(g, 0.938, 0.965));
         labelRef.current.style.transform = `translateY(${lerp(28, 0, t)}px)`;
         labelRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
       }
 
-      // --- Subtitle: 0.86–0.93 ---
+      // --- Subtitle: 0.948–0.975 ---
       if (subtitleRef.current) {
-        const t = easeOutCubic(rangeProgress(g, 0.86, 0.93));
+        const t = easeOutCubic(rangeProgress(g, 0.948, 0.975));
         subtitleRef.current.style.transform = `translateY(${lerp(24, 0, t)}px)`;
         subtitleRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
       }
 
-      // --- Card 1: 0.88–0.955 ---
+      // --- Card 1: 0.962–0.99 ---
       if (card1WrapRef.current) {
-        const t = easeOutCubic(rangeProgress(g, 0.88, 0.955));
+        const t = easeOutCubic(rangeProgress(g, 0.962, 0.99));
         card1WrapRef.current.style.transform = `translateY(${lerp(50, 0, t)}px)`;
         card1WrapRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
         card1WrapRef.current.style.pointerEvents = t > 0.8 ? 'auto' : 'none';
       }
 
-      // --- Card 2: 0.905–0.97 ---
+      // --- Card 2: 0.968–0.997 ---
       if (card2WrapRef.current) {
-        const t = easeOutCubic(rangeProgress(g, 0.905, 0.97));
+        const t = easeOutCubic(rangeProgress(g, 0.968, 0.997));
         card2WrapRef.current.style.transform = `translateY(${lerp(50, 0, t)}px)`;
         card2WrapRef.current.style.clipPath = `inset(0 0 ${lerp(100, 0, t)}% 0)`;
         card2WrapRef.current.style.pointerEvents = t > 0.8 ? 'auto' : 'none';
@@ -205,7 +321,7 @@ export default function SelectionReveal() {
 
       // Enable layer interaction once settled
       if (layerRef.current) {
-        const shouldBeInteractive = g > 0.965;
+        const shouldBeInteractive = g > 0.985;
         if (shouldBeInteractive !== interactiveRef.current) {
           interactiveRef.current = shouldBeInteractive;
           layerRef.current.style.pointerEvents = shouldBeInteractive ? 'auto' : 'none';
@@ -219,10 +335,13 @@ export default function SelectionReveal() {
     };
   }, [subscribe, reducedMotion]);
 
+  const selectedDetails = selectedCard ? LAUNCH_CARDS[selectedCard] : null;
+
   return (
     <div
       ref={layerRef}
       className={styles.selectionLayer}
+      data-modal-open={selectedCard ? 'true' : undefined}
       style={{ visibility: 'hidden', pointerEvents: 'none' }}
     >
       <div className={styles.selectionContent}>
@@ -267,19 +386,26 @@ export default function SelectionReveal() {
           >
             <button
               type="button"
-              ref={card1Ref}
-              onMouseMove={handleCard1Move}
-              onMouseLeave={handleCard1Leave}
-              onClick={() => router.push('/sandbox/circuit')}
+              onClick={(event) => {
+                resetCardMotion(event.currentTarget);
+                openDetails('circuit');
+              }}
+              onPointerMove={handleCardPointerMove}
+              onPointerLeave={(event) => resetCardMotion(event.currentTarget)}
+              onPointerCancel={(event) => resetCardMotion(event.currentTarget)}
+              onBlur={(event) => resetCardMotion(event.currentTarget)}
               className={`${styles.card} appearance-none border-0 p-0 text-left`}
+              aria-haspopup="dialog"
             >
+              <span className={styles.cardRank} aria-hidden="true">01</span>
               <div className={styles.cardImageWrap}>
                 <Image
                   alt="Circuit Playground"
                   className={styles.cardImage}
                   fill
+                  loading="eager"
                   sizes="(max-width: 768px) 90vw, 400px"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpZ25JnRjxUlIXIkrCNwWIxhTIJe2awdiU0bArXjBfmnUjUhN7NTrfMCzmDtTExMRrfI6E9VDX4CtfIkXdMqu1Q4HL1lvLuDGDDkrHdTA3xpZOdaGySBwgmO-IQJuj6ljVSgyfvK4hvGFI5BeH78QQlycrP7t9DEqRBiSkwc3DZxZo6C6x_xmExP-PO2HdhZSW22o963q1XwAO9GFUoDYqEq820rwwaJ2giFVRnuFXZ-jfnALJIyOExLiaS_fnSDUIayNaP9v6ESgU"
+                  src={LAUNCH_CARDS.circuit.image}
                 />
               </div>
               <div className={styles.cardMeta}>
@@ -296,7 +422,7 @@ export default function SelectionReveal() {
             </button>
           </div>
 
-          {/* Card 2: Research Vault */}
+          {/* Card 2: Quantum Resources */}
           <div
             ref={card2WrapRef}
             className={styles.cardPerspective}
@@ -304,19 +430,25 @@ export default function SelectionReveal() {
           >
             <button
               type="button"
-              ref={card2Ref}
-              onMouseMove={handleCard2Move}
-              onMouseLeave={handleCard2Leave}
-              onClick={() => router.push('/sandbox/research')}
+              onClick={(event) => {
+                resetCardMotion(event.currentTarget);
+                openDetails('research');
+              }}
+              onPointerMove={handleCardPointerMove}
+              onPointerLeave={(event) => resetCardMotion(event.currentTarget)}
+              onPointerCancel={(event) => resetCardMotion(event.currentTarget)}
+              onBlur={(event) => resetCardMotion(event.currentTarget)}
               className={`${styles.card} appearance-none border-0 p-0 text-left`}
+              aria-haspopup="dialog"
             >
+              <span className={styles.cardRank} aria-hidden="true">02</span>
               <div className={styles.cardImageWrap}>
                 <Image
-                  alt="Research Vault"
+                  alt="Quantum Resources"
                   className={styles.cardImage}
                   fill
                   sizes="(max-width: 768px) 90vw, 400px"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVdACyLaDxVMWXnb7AlxxJEANtmHWdtVRqAkIRIbm7dlNyxrMHj_Z66g_azl8CrQ0qr0-HcL4hTZXl8fE85bRp6W_SMvFiFC1imGV61g0p_5PnYR9WGrNphln3S9SFKMBWAJ9HBWaSP3ZDB91G8_v-jG9HsM3hxtvUxS3kB0nJJ9zKq7jTQt0-p9M5OJ4rhp_XyzO7uYtqL3aoONUaBd0Di3A-01L3DGm_9c3dlFn9Gd-5V4nXokXHq6-W6tvS1Y4DEDkh2aqkPTHx"
+                  src={LAUNCH_CARDS.research.image}
                 />
               </div>
               <div className={styles.cardMeta}>
@@ -328,12 +460,102 @@ export default function SelectionReveal() {
                     history_edu
                   </span>
                 </div>
-                <h3 className={styles.cardTitle}>Research Vault</h3>
+                <h3 className={styles.cardTitle}>Quantum Resources</h3>
               </div>
             </button>
           </div>
         </div>
       </div>
+
+      {selectedDetails && (
+        <dialog
+          open
+          className={styles.detailOverlay}
+          data-closing={isClosing ? 'true' : undefined}
+          aria-modal="true"
+          aria-labelledby="launch-detail-title"
+        >
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className={styles.detailClose}
+            onClick={closeDetails}
+            disabled={isClosing}
+            aria-label="Close mission details"
+          >
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+          </button>
+
+          <div className={styles.detailStage}>
+            <article className={styles.detailArtCard}>
+              <span className={styles.detailRank}>{selectedDetails.rank}</span>
+              <div className={styles.detailArtImage}>
+                <Image
+                  src={selectedDetails.image}
+                  alt={`${selectedDetails.title} illustrated mission art`}
+                  fill
+                  sizes="(max-width: 760px) 82vw, 42vw"
+                />
+              </div>
+              <div className={styles.detailArtFooter}>
+                <span>{selectedDetails.code}</span>
+                <strong>{selectedDetails.title}</strong>
+                <small>{selectedDetails.role}</small>
+              </div>
+            </article>
+
+            <article
+              className={styles.detailInfoCard}
+            >
+              <div className={styles.detailInfoIntro}>
+                <span className={styles.detailEyebrow}>Mission dossier // {selectedDetails.rank}</span>
+                <h3 id="launch-detail-title">{selectedDetails.title}</h3>
+                <p className={styles.detailRole}>{selectedDetails.role}</p>
+                <p className={styles.detailDescription}>{selectedDetails.description}</p>
+              </div>
+
+              <dl className={styles.detailStats}>
+                {selectedDetails.stats.map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <button
+                type="button"
+                className={styles.detailLaunchButton}
+                onClick={() => selectedCard && launchDestination(selectedCard)}
+                disabled={Boolean(launching)}
+              >
+                Let&apos;s go
+                <span aria-hidden="true">↗</span>
+              </button>
+            </article>
+          </div>
+        </dialog>
+      )}
+
+      {launching && createPortal((
+        <output className={styles.routeTransition} aria-live="assertive">
+          <div className={styles.routeTransitionGrid} aria-hidden="true" />
+          <div className={styles.routeTransitionOrbit} aria-hidden="true">
+            <AtomLogo />
+            <span /><span /><span />
+          </div>
+          <div className={styles.routeTransitionCopy}>
+            <span>Q-QUEST / TRANSFER SEQUENCE</span>
+            <strong>{launching === 'circuit' ? 'Calibrating circuit playground' : 'Indexing resource archive'}</strong>
+            <p>{launching === 'circuit' ? 'Preparing qubits, gates, state vectors, and live matrices.' : 'Synchronizing field notes, explainers, and research signals.'}</p>
+          </div>
+          <div className={styles.routeTransitionMeter} aria-hidden="true"><i /></div>
+          <div className={styles.routeTransitionStatus}>
+            <span>SECURE UPLINK</span><span>ROUTE LOCKED</span><b>( LOADING )</b>
+          </div>
+        </output>
+      ), document.body)}
     </div>
   );
 }

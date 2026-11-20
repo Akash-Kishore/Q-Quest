@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "oxlint --react-plugin --jsx-a11y-plugin --nextjs-plugin --import-plugin --deny-warnings app components",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:quantum": "node --experimental-strip-types --test app/sandbox/circuit/quantum.test.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

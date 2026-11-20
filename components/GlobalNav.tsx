@@ -16,7 +16,7 @@ export default function GlobalNav() {
   return (
     <nav className={styles.navbar}>
       <div className={styles.navContainer}>
-        <div className={styles.brand}>Q_QUEST</div>
+        <Link href="/home" className={styles.brand}>Q_QUEST</Link>
         <div className={styles.navLinks}>
           {links.map((link) => (
             <Link
