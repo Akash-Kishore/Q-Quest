@@ -56,7 +56,7 @@ export default function AboutTeaser() {
           <Link href="/about">About</Link>
           <Link href="/sandbox/circuit">Circuit playground</Link>
           <Link href="/sandbox/research">Resources</Link>
-          <Link href="/website-resources">Resources &amp; copyright</Link>
+          <Link href="/website-resources">Code &amp; copyright</Link>
         </div>
 
         <div className={styles.aboutLinkColumn}>

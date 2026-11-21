@@ -173,6 +173,8 @@
 .education {
   padding: clamp(5rem, 10vw, 10rem) clamp(1.25rem, 4vw, 4.5rem);
   border-top: 1px solid var(--line);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
 }
 
 .sectionLabel { color: var(--violet); }

@@ -19,6 +19,10 @@ function smoothstep(a: number, b: number, x: number): number {
 }
 function easeOutCubic(t: number): number { return 1 - Math.pow(1 - t, 3); }
 
+function getRenderPixelRatio(width: number): number {
+  return Math.min(window.devicePixelRatio || 1, width < 768 ? 1.25 : 1.5);
+}
+
 // Deterministic hash
 function hash(n: number): number {
   const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453123;
@@ -346,7 +350,7 @@ export default function PixelTransition() {
     // --- Viewport ---
     let w = container.clientWidth || window.innerWidth;
     let h = container.clientHeight || window.innerHeight;
-    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let dpr = getRenderPixelRatio(w);
     let aspect = w / h;
 
     // --- Adaptive screen-block lattice ---
@@ -369,7 +373,11 @@ export default function PixelTransition() {
     }
 
     // --- Single renderer, two scenes (one WebGL context) ---
-    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      alpha: true,
+      powerPreference: 'high-performance',
+    });
     renderer.setSize(w, h);
     renderer.setPixelRatio(dpr);
     renderer.setClearColor(0x000000, 0);
@@ -479,7 +487,7 @@ export default function PixelTransition() {
     pixelScene.add(points);
 
     // --- New spheres (shared unit geometry, per-sphere material) ---
-    const sphereGeom = new THREE.SphereGeometry(1, 32, 32);
+    const sphereGeom = new THREE.SphereGeometry(1, 24, 24);
     let sphereMeshes: { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; cfg: SphereCfg }[] = [];
     let physicsBodies: { active: boolean; x: number; y: number; vx: number; vy: number }[] = [];
 
@@ -513,9 +521,6 @@ export default function PixelTransition() {
     }
     buildSpheres();
 
-    // --- Scroll subscription ---
-    const unsub = subscribe((p: number) => { progressRef.current = p; });
-
     // --- Mouse tracking (normalized, damped) ---
     const mouseTarget = { x: 0, y: 0 };
     const mouseCurrent = { x: 0, y: 0 };
@@ -532,7 +537,7 @@ export default function PixelTransition() {
     // --- Responsive resize (ResizeObserver: size + DPR + density-independent layout) ---
     function applySize() {
       aspect = w / h;
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = getRenderPixelRatio(w);
 
       renderer.setPixelRatio(dpr);
       renderer.setSize(w, h);
@@ -561,20 +566,37 @@ export default function PixelTransition() {
         buildSpheres();
       }
     }
+    let resizeFrame = 0;
     const ro = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (!rect || rect.width === 0 || rect.height === 0) return;
       w = Math.round(rect.width);
       h = Math.round(rect.height);
-      applySize();
+      if (!resizeFrame) {
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = 0;
+          applySize();
+        });
+      }
     });
     ro.observe(container);
 
     // --- Animation loop ---
     let rafId = 0;
+    let isRunning = false;
     let previousTime = performance.now() * 0.001;
-    function animate() {
+    function startAnimation() {
+      const g = progressRef.current;
+      if (isRunning || document.hidden || g < 0.56 || g > 1.02) return;
+      isRunning = true;
+      previousTime = performance.now() * 0.001;
       rafId = requestAnimationFrame(animate);
+    }
+    function animate() {
+      if (document.hidden) {
+        isRunning = false;
+        return;
+      }
 
       const g = progressRef.current;
       const time = performance.now() * 0.001;
@@ -584,6 +606,7 @@ export default function PixelTransition() {
       // Only draw while the transition is on stage
       if (g < 0.56 || g > 1.02) {
         renderer.clear();
+        isRunning = false;
         return;
       }
 
@@ -696,7 +719,7 @@ export default function PixelTransition() {
         const baseScale = c.r * halfHeightWorld * emerge;
         // Uniform scaling keeps the projected silhouette perfectly circular.
         s.mesh.scale.setScalar(baseScale);
-        s.mesh.rotation.y += c.spin;
+        s.mesh.rotation.y += c.spin * deltaTime * 60;
         s.mesh.rotation.x = mouseCurrent.y * 0.15;
         s.mesh.rotation.z = mouseCurrent.x * 0.10;
       }
@@ -775,14 +798,30 @@ export default function PixelTransition() {
       renderer.clear();
       renderer.render(sphereScene, sphereCamera);
       renderer.render(pixelScene, pixelCamera);
+      rafId = requestAnimationFrame(animate);
     }
-    animate();
+
+    const unsub = subscribe((p: number) => {
+      progressRef.current = p;
+      if (p >= 0.56 && p <= 1.02) startAnimation();
+    });
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        isRunning = false;
+        cancelAnimationFrame(rafId);
+      } else {
+        startAnimation();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     // --- Cleanup ---
     return () => {
       cancelAnimationFrame(rafId);
+      cancelAnimationFrame(resizeFrame);
       unsub();
       ro.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseleave', onMouseLeave);
 

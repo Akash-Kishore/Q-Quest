@@ -20,6 +20,11 @@ function rangeProgress(progress: number, start: number, end: number): number {
   return clamp01((progress - start) / (end - start));
 }
 
+function getRenderPixelRatio(): number {
+  const cap = window.innerWidth < 768 ? 1.25 : 1.5;
+  return Math.min(window.devicePixelRatio || 1, cap);
+}
+
 // Custom easings for cinematic rhythm
 function easeInOutQuart(t: number): number {
   return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
@@ -208,9 +213,13 @@ export default function SphereScene() {
     );
     camera.position.set(0, 0.3, 12);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(getRenderPixelRatio());
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
@@ -218,7 +227,7 @@ export default function SphereScene() {
     scene.add(mainGroup);
 
     // --- Core sphere ---
-    const coreGeometry = new THREE.SphereGeometry(2.0, 64, 64);
+    const coreGeometry = new THREE.SphereGeometry(2.0, 48, 48);
     const coreMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uColor: { value: new THREE.Color(0x050005) },
@@ -248,7 +257,7 @@ export default function SphereScene() {
 
       // Orbit line
       const curve = new THREE.EllipseCurve(0, 0, 3.5, 3.5, 0, 2 * Math.PI, false, 0);
-      const points = curve.getPoints(120);
+      const points = curve.getPoints(96);
       const orbitGeometry = new THREE.BufferGeometry().setFromPoints(points);
       const orbitMaterial = new THREE.LineBasicMaterial({
         color: 0xff1493,
@@ -259,7 +268,7 @@ export default function SphereScene() {
       orbitLine.rotation.x = Math.PI / 2;
 
       // Electron
-      const electronGeom = new THREE.SphereGeometry(0.18, 32, 32);
+      const electronGeom = new THREE.SphereGeometry(0.18, 20, 20);
       const electronMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
@@ -293,7 +302,7 @@ export default function SphereScene() {
       mainGroup,
       electrons,
       animationId: 0,
-      isActive: true,
+      isActive: false,
       targetRotationX: 0,
       targetRotationY: 0,
       currentRotationX: 0,
@@ -302,25 +311,35 @@ export default function SphereScene() {
     sceneStateRef.current = state;
 
     // --- Mouse interaction ---
-    let resetTimer: ReturnType<typeof setTimeout>;
+    let lastPointerMoveTime = performance.now();
     const onMouseMove = (e: MouseEvent) => {
-      clearTimeout(resetTimer);
+      lastPointerMoveTime = performance.now();
       state.targetRotationY = ((e.clientX / window.innerWidth) - 0.5) * Math.PI * 0.5;
       state.targetRotationX = ((e.clientY / window.innerHeight) - 0.5) * Math.PI * 0.3;
-      resetTimer = setTimeout(() => {
-        state.targetRotationX = 0;
-        state.targetRotationY = 0;
-      }, 2500);
     };
     window.addEventListener('mousemove', onMouseMove, { passive: true });
 
     // --- Resize ---
-    const onResize = () => {
+    let resizeFrame = 0;
+    const applyResize = () => {
+      resizeFrame = 0;
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(getRenderPixelRatio());
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
-    window.addEventListener('resize', onResize);
+    const onResize = () => {
+      if (!resizeFrame) resizeFrame = requestAnimationFrame(applyResize);
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+
+    let previousFrame = performance.now();
+    const startAnimation = () => {
+      if (state.isActive || document.hidden) return;
+      state.isActive = true;
+      previousFrame = performance.now();
+      state.animationId = requestAnimationFrame(animate);
+    };
 
     // --- Scroll subscription ---
     const unsub = subscribe((p: number) => {
@@ -328,18 +347,33 @@ export default function SphereScene() {
 
       // Reactivate rendering on reverse scroll
       if (p < 0.72 && !state.isActive) {
-        state.isActive = true;
-        animate();
+        startAnimation();
       }
     });
 
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        state.isActive = false;
+        cancelAnimationFrame(state.animationId);
+      } else if (progressRef.current <= 0.74) {
+        startAnimation();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     // --- Animation loop ---
-    function animate() {
-      if (!state.isActive) return;
-      state.animationId = requestAnimationFrame(animate);
+    function animate(frameTime: number) {
+      if (!state.isActive || document.hidden) return;
 
       const progress = progressRef.current;
-      const time = Date.now() * 0.001;
+      const time = frameTime * 0.001;
+      const deltaTime = Math.min(0.05, Math.max(0, (frameTime - previousFrame) * 0.001));
+      previousFrame = frameTime;
+
+      if (frameTime - lastPointerMoveTime > 2500) {
+        state.targetRotationX = 0;
+        state.targetRotationY = 0;
+      }
 
       // --- Camera choreography ---
       const cam = getCameraState(progress);
@@ -351,13 +385,14 @@ export default function SphereScene() {
       camera.lookAt(0, 0, 0);
 
       // --- Mouse-driven subtle rotation ---
-      state.currentRotationX += (state.targetRotationX - state.currentRotationX) * 0.008;
-      state.currentRotationY += (state.targetRotationY - state.currentRotationY) * 0.008;
+      const rotationEase = 1 - Math.exp(-0.48 * deltaTime);
+      state.currentRotationX += (state.targetRotationX - state.currentRotationX) * rotationEase;
+      state.currentRotationY += (state.targetRotationY - state.currentRotationY) * rotationEase;
       mainGroup.rotation.x = state.currentRotationX;
       mainGroup.rotation.y = state.currentRotationY;
 
       // --- Core rotation and shader ---
-      core.rotation.y += 0.008;
+      core.rotation.y += 0.48 * deltaTime;
       coreMaterial.uniforms.uTime.value = time;
 
       // Glow intensification during hold (0.55–0.68), then dim
@@ -387,7 +422,7 @@ export default function SphereScene() {
 
       electrons.forEach((e) => {
         // Update angle
-        e.data.angle += orbit.speed;
+        e.data.angle += orbit.speed * deltaTime * 60;
 
         // Position electron at current orbit radius
         e.mesh.position.set(
@@ -406,15 +441,8 @@ export default function SphereScene() {
         const orbitLineMat = e.orbitLine.material as THREE.LineBasicMaterial;
         orbitLineMat.opacity = orbit.opacity * 0.2;
 
-        // Regenerate orbit line geometry at new radius
-        if (Math.abs(orbit.radius - 3.5) > 0.1) {
-          const curve = new THREE.EllipseCurve(
-            0, 0, orbit.radius, orbit.radius, 0, 2 * Math.PI, false, 0
-          );
-          const points = curve.getPoints(120);
-          e.orbitLine.geometry.dispose();
-          e.orbitLine.geometry = new THREE.BufferGeometry().setFromPoints(points);
-        }
+        // Scale the static orbit geometry instead of reallocating GPU buffers.
+        e.orbitLine.scale.setScalar(orbit.radius / 3.5);
       });
 
       // --- Render to screen ---
@@ -423,10 +451,12 @@ export default function SphereScene() {
       // --- Pause when sphere is fully faded (performance) ---
       if (progress > 0.74) {
         state.isActive = false;
+        return;
       }
+      state.animationId = requestAnimationFrame(animate);
     }
 
-    animate();
+    startAnimation();
 
     // --- Cleanup (component unmount only — NOT during scroll) ---
     return () => {
@@ -434,7 +464,8 @@ export default function SphereScene() {
       cancelAnimationFrame(state.animationId);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('resize', onResize);
-      clearTimeout(resetTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      cancelAnimationFrame(resizeFrame);
       unsub();
 
       if (container.contains(renderer.domElement)) {

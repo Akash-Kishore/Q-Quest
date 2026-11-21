@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const PROCESS_LINES = [
@@ -20,8 +20,8 @@ export default function LoadingPage() {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isDone, setIsDone] = useState(false);
-  const [latency, setLatency] = useState("0.002");
-  const [coord, setCoord] = useState("40.7128");
+  const latencyRef = useRef<HTMLSpanElement>(null);
+  const coordRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -43,8 +43,13 @@ export default function LoadingPage() {
 
   useEffect(() => {
     const telemetryInterval = setInterval(() => {
-      setLatency((Math.random() * (0.009 - 0.001) + 0.001).toFixed(3));
-      setCoord((40.7128 + (Math.random() - 0.5) * 0.001).toFixed(4));
+      if (document.hidden) return;
+      if (latencyRef.current) {
+        latencyRef.current.textContent = `${(Math.random() * (0.009 - 0.001) + 0.001).toFixed(3)}MS`;
+      }
+      if (coordRef.current) {
+        coordRef.current.textContent = `${(40.7128 + (Math.random() - 0.5) * 0.001).toFixed(4)} N`;
+      }
     }, 200);
     return () => clearInterval(telemetryInterval);
   }, []);
@@ -411,7 +416,7 @@ export default function LoadingPage() {
               <div className="telemetry-grid">
                 <div className="telemetry-item">
                   <span className="telemetry-label">LATENCY</span>
-                  <span className="telemetry-value" id="telemetry-latency">{latency}MS</span>
+                  <span ref={latencyRef} className="telemetry-value" id="telemetry-latency">0.002MS</span>
                 </div>
                 <div className="telemetry-item">
                   <span className="telemetry-label">BUFFER</span>
@@ -423,7 +428,7 @@ export default function LoadingPage() {
                 </div>
                 <div className="telemetry-item">
                   <span className="telemetry-label">COORD</span>
-                  <span className="telemetry-value" id="telemetry-coord">{coord} N</span>
+                  <span ref={coordRef} className="telemetry-value" id="telemetry-coord">40.7128 N</span>
                 </div>
               </div>
             </div>

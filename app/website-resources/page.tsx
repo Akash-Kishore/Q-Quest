@@ -4,7 +4,7 @@ import InteractiveBrand from '@/components/InteractiveBrand';
 import styles from './resources.module.css';
 
 export const metadata: Metadata = {
-  title: 'Resources & Copyright · Q-Quest',
+  title: 'Code & Copyright · Q-Quest',
   description: 'Q-Quest source resources, copyright notice, and permission information.',
 };
 
@@ -29,7 +29,7 @@ export default function WebsiteResourcesPage() {
 
       <section className={styles.resource} aria-labelledby="resources-title">
         <div className={styles.grid} aria-hidden="true" />
-        <span>01 / RESOURCES &amp; COPYRIGHT</span>
+        <span>01 / CODE &amp; COPYRIGHT</span>
         <h1 id="resources-title">Source and rights,<br />in one place.</h1>
         <p>
           Inspect Q-Quest on GitHub. Eligible original project code and content
@@ -52,7 +52,7 @@ export default function WebsiteResourcesPage() {
 
       <footer className={styles.footer}>
         <strong>Q-QUEST</strong>
-        <span>Resources &amp; copyright</span>
+        <span>Code &amp; copyright</span>
         <span>Source and rights · 2026</span>
       </footer>
     </main>

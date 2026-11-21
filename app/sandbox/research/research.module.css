@@ -252,7 +252,12 @@
 .heroAside a { display: inline-flex; align-items: center; color: var(--ink); text-decoration: none; font-size: .84rem; font-weight: 900; }
 .heroAside a::after { content: 'READ'; margin-left: 14px; padding: 8px 10px; border-radius: 999px; background: #17151e; color: white; font: 700 .57rem/1 'JetBrains Mono', monospace; letter-spacing: .08em; }
 
-.feed { padding: 8vh clamp(18px, 5vw, 80px) 11vh; position: relative; }
+.feed {
+  padding: 8vh clamp(18px, 5vw, 80px) 11vh;
+  position: relative;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1000px;
+}
 .sectionHead { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
 .sectionHead h2 { margin: 6px 0 0; font: 900 clamp(2.3rem, 4.3vw, 4.8rem)/.9 'Cabinet Grotesk', 'Satoshi', sans-serif; letter-spacing: -.065em; }
 .sectionHead span,

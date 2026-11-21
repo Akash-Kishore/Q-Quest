@@ -20,25 +20,38 @@ export default function LandingPage() {
     const gridLayer = document.getElementById('parallax-grid');
     const coordsDisplay = document.getElementById('coords-display');
 
-    // High-friction parallax logic
+    // High-friction parallax logic. The loop sleeps once it reaches its target
+    // and wakes on pointer input instead of consuming a frame forever.
     let targetX = 0;
     let targetY = 0;
     let currentX = 0;
     let currentY = 0;
     const friction = 0.05;
-    let animationId: number;
+    let animationId = 0;
+    let previousTime = performance.now();
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
+        if (e.pointerType !== 'mouse') return;
         targetX = (e.clientX - window.innerWidth / 2) * -0.05;
         targetY = (e.clientY - window.innerHeight / 2) * -0.05;
+        if (animationId === 0 && !document.hidden) {
+          previousTime = performance.now();
+          animationId = requestAnimationFrame(animate);
+        }
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('pointermove', handlePointerMove, { passive: true });
 
-    function animate() {
+    function animate(time: number) {
+        animationId = 0;
+        if (document.hidden) return;
+        const deltaScale = Math.min(3, Math.max(0.5, (time - previousTime) / (1000 / 60)));
+        previousTime = time;
+        const frameFriction = 1 - Math.pow(1 - friction, deltaScale);
+
         // Smooth inertia calculation
-        currentX += (targetX - currentX) * friction;
-        currentY += (targetY - currentY) * friction;
+        currentX += (targetX - currentX) * frameFriction;
+        currentY += (targetY - currentY) * frameFriction;
 
         if (starLayer) {
             starLayer.style.transform = `translate(${currentX * 1.5}px, ${currentY * 1.5}px)`;
@@ -46,12 +59,15 @@ export default function LandingPage() {
         if (gridLayer) {
             gridLayer.style.transform = `translate(${currentX * 0.8}px, ${currentY * 0.8}px)`;
         }
-        animationId = requestAnimationFrame(animate);
+        const remainingX = Math.abs(targetX - currentX);
+        const remainingY = Math.abs(targetY - currentY);
+        if (remainingX > 0.01 || remainingY > 0.01) {
+          animationId = requestAnimationFrame(animate);
+        }
     }
-    animate();
 
     // Shifting coordinates logic
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     function updateCoords() {
         const baseLat = 40.7128;
         const baseLon = 74.0060;
@@ -63,8 +79,24 @@ export default function LandingPage() {
     }
     updateCoords();
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animationId);
+        animationId = 0;
+        clearTimeout(timeoutId);
+        return;
+      }
+      updateCoords();
+      if (Math.abs(targetX - currentX) > 0.01 || Math.abs(targetY - currentY) > 0.01) {
+        previousTime = performance.now();
+        animationId = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       cancelAnimationFrame(animationId);
       clearTimeout(timeoutId);
     };

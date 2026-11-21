@@ -4,6 +4,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   useSyncExternalStore,
   createContext,
   useContext,
@@ -60,6 +61,7 @@ export default function HomeScrollController({ children }: HomeScrollControllerP
   const stageRef = useRef<HTMLDivElement>(null);
   const subscribersRef = useRef<Set<ScrollSubscriber>>(new Set());
   const lenisRef = useRef<Lenis | null>(null);
+  const scrollLockedRef = useRef(false);
   const reducedMotion = useSyncExternalStore(
     subscribeToReducedMotion,
     getReducedMotionSnapshot,
@@ -74,7 +76,8 @@ export default function HomeScrollController({ children }: HomeScrollControllerP
   }, []);
 
   const setScrollLocked = useCallback((locked: boolean) => {
-    if (locked) lenisRef.current?.stop();
+    scrollLockedRef.current = locked;
+    if (locked || document.hidden) lenisRef.current?.stop();
     else lenisRef.current?.start();
   }, []);
 
@@ -105,6 +108,26 @@ export default function HomeScrollController({ children }: HomeScrollControllerP
     };
     gsap.ticker.add(tickerCallback);
     gsap.ticker.lagSmoothing(0);
+    let tickerAttached = true;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        lenis.stop();
+        if (tickerAttached) {
+          gsap.ticker.remove(tickerCallback);
+          tickerAttached = false;
+        }
+        return;
+      }
+
+      if (!tickerAttached) {
+        gsap.ticker.add(tickerCallback);
+        tickerAttached = true;
+      }
+      if (!scrollLockedRef.current) lenis.start();
+      ScrollTrigger.refresh();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // --- ScrollTrigger: pin the cinematic stage ---
     const st = ScrollTrigger.create({
@@ -130,16 +153,16 @@ export default function HomeScrollController({ children }: HomeScrollControllerP
       st.kill();
       lenis.destroy();
       lenisRef.current = null;
-      gsap.ticker.remove(tickerCallback);
-      ScrollTrigger.getAll().forEach((t) => t.kill());
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (tickerAttached) gsap.ticker.remove(tickerCallback);
     };
   }, [reducedMotion]);
 
-  const contextValue: HomeScrollContextValue = {
+  const contextValue = useMemo<HomeScrollContextValue>(() => ({
     subscribe,
     reducedMotion,
     setScrollLocked,
-  };
+  }), [subscribe, reducedMotion, setScrollLocked]);
 
   return (
     <HomeScrollContext.Provider value={contextValue}>

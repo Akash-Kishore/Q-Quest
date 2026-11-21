@@ -11,6 +11,10 @@ export default function HudGrid() {
   const { subscribe, reducedMotion } = useHomeScroll();
   const containerRef = useRef<HTMLDivElement>(null);
   const pulseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pulseResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activePulseModuleRef = useRef<HTMLElement | null>(null);
+  const progressRef = useRef(0);
+  const pulseControllerRef = useRef<{ start: () => void; stop: () => void } | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -19,6 +23,7 @@ export default function HudGrid() {
     // Generate grid modules
     const totalSlots = 12 * 8;
     const occupied = new Set<number>();
+    const modules: HTMLElement[] = [];
 
     for (let i = 0; i < totalSlots; i++) {
       if (occupied.has(i)) continue;
@@ -52,34 +57,64 @@ export default function HudGrid() {
       mod.appendChild(label);
 
       container.appendChild(mod);
+      modules.push(mod);
     }
 
-    // Pulse random modules for activity
-    pulseIntervalRef.current = setInterval(() => {
-      const modules = container.querySelectorAll(`.${styles.hudModule}`);
-      const idx = Math.floor(Math.random() * modules.length);
-      const m = modules[idx] as HTMLElement | undefined;
-      if (m) {
+    const stopPulse = () => {
+      if (pulseIntervalRef.current) clearInterval(pulseIntervalRef.current);
+      if (pulseResetRef.current) clearTimeout(pulseResetRef.current);
+      if (activePulseModuleRef.current) {
+        activePulseModuleRef.current.style.background = 'rgba(255, 255, 255, 0.01)';
+        activePulseModuleRef.current.style.borderColor = '';
+      }
+      pulseIntervalRef.current = null;
+      pulseResetRef.current = null;
+      activePulseModuleRef.current = null;
+    };
+
+    const startPulse = () => {
+      if (pulseIntervalRef.current || document.hidden || progressRef.current >= 0.70) return;
+      pulseIntervalRef.current = setInterval(() => {
+        const m = modules[Math.floor(Math.random() * modules.length)];
+        if (!m) return;
+        if (activePulseModuleRef.current && activePulseModuleRef.current !== m) {
+          activePulseModuleRef.current.style.background = 'rgba(255, 255, 255, 0.01)';
+          activePulseModuleRef.current.style.borderColor = '';
+        }
         m.style.background = 'rgba(255, 255, 255, 0.05)';
         m.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-        setTimeout(() => {
-          if (m) {
-            m.style.background = 'rgba(255, 255, 255, 0.01)';
-            m.style.borderColor = '';
-          }
+        if (pulseResetRef.current) clearTimeout(pulseResetRef.current);
+        activePulseModuleRef.current = m;
+        pulseResetRef.current = setTimeout(() => {
+          m.style.background = 'rgba(255, 255, 255, 0.01)';
+          m.style.borderColor = '';
+          pulseResetRef.current = null;
+          activePulseModuleRef.current = null;
         }, 800);
-      }
-    }, 500);
+      }, 500);
+    };
+    pulseControllerRef.current = { start: startPulse, stop: stopPulse };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) stopPulse();
+      else startPulse();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    startPulse();
 
     if (reducedMotion) {
       container.style.display = 'none';
       return () => {
-        if (pulseIntervalRef.current) clearInterval(pulseIntervalRef.current);
+        stopPulse();
+        pulseControllerRef.current = null;
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
 
     return () => {
-      if (pulseIntervalRef.current) clearInterval(pulseIntervalRef.current);
+      stopPulse();
+      pulseControllerRef.current = null;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [reducedMotion]);
 
@@ -88,6 +123,7 @@ export default function HudGrid() {
     if (reducedMotion) return;
 
     const unsub = subscribe((progress: number) => {
+      progressRef.current = progress;
       const container = containerRef.current;
       if (!container) return;
 
@@ -112,12 +148,10 @@ export default function HudGrid() {
       if (progress >= 0.70) {
         container.style.display = 'none';
         // Stop pulsing
-        if (pulseIntervalRef.current) {
-          clearInterval(pulseIntervalRef.current);
-          pulseIntervalRef.current = null;
-        }
+        pulseControllerRef.current?.stop();
       } else {
         container.style.display = '';
+        pulseControllerRef.current?.start();
       }
     });
 
@@ -131,14 +165,26 @@ export default function HudGrid() {
     const container = containerRef.current;
     if (!container) return;
 
-    const handleMouse = (e: MouseEvent) => {
-      const moveX = (e.clientX / window.innerWidth - 0.5) * 20;
-      const moveY = (e.clientY / window.innerHeight - 0.5) * 20;
+    let pointerFrame = 0;
+    let pointerX = 0;
+    let pointerY = 0;
+    const applyPointer = () => {
+      pointerFrame = 0;
+      const moveX = (pointerX / window.innerWidth - 0.5) * 20;
+      const moveY = (pointerY / window.innerHeight - 0.5) * 20;
       container.style.transform = `translate3d(${moveX}px, ${moveY}px, 0)`;
+    };
+    const handleMouse = (e: MouseEvent) => {
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+      if (!pointerFrame) pointerFrame = requestAnimationFrame(applyPointer);
     };
 
     window.addEventListener('mousemove', handleMouse, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouse);
+    return () => {
+      window.removeEventListener('mousemove', handleMouse);
+      cancelAnimationFrame(pointerFrame);
+    };
   }, [reducedMotion]);
 
   return (
