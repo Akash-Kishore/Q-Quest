@@ -51,7 +51,7 @@ export async function circuitPng(circuit: SavedCircuit): Promise<Blob> {
   context.fillText(circuit.name, left, 42, width - 2 * left);
   context.fillStyle = '#6f6b7a';
   context.font = '13px Arial, sans-serif';
-  context.fillText(`${circuit.qubits} qubits · ${circuit.gates.length} gates · Q-Quest`, left, 68);
+  context.fillText(`${circuit.qubits} qubits · ${circuit.gates.length} gates`, left, 68);
 
   const xAt = (column: number) => left + labelWidth + (column + 0.5) * cellWidth;
   const yAt = (qubit: number) => top + qubit * rowHeight;
@@ -107,6 +107,14 @@ export async function circuitPng(circuit: SavedCircuit): Promise<Blob> {
         context.fillText(symbol, x, y + 5, 40);
       });
     });
+
+  context.save();
+  context.globalAlpha = 0.58;
+  context.fillStyle = '#6f6b7a';
+  context.font = 'bold 12px Arial, sans-serif';
+  context.textAlign = 'right';
+  context.fillText('Q-QUEST', width - left, height - 22);
+  context.restore();
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('PNG export failed')), 'image/png');
