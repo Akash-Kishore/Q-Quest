@@ -608,6 +608,42 @@
   left: 48px;
 }
 
+.heroScrollCue {
+  position: absolute;
+  bottom: clamp(36px, 6vh, 72px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  color: rgba(242, 238, 255, .78);
+  font: 700 10px/1 'JetBrains Mono', monospace;
+  letter-spacing: .22em;
+  white-space: nowrap;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, .6);
+  will-change: opacity;
+}
+
+.heroScrollArrow {
+  width: 1px;
+  height: 28px;
+  background: linear-gradient(to bottom, rgba(242, 238, 255, .2), rgba(242, 238, 255, .9));
+  position: relative;
+}
+
+.heroScrollArrow::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid rgba(242, 238, 255, .9);
+  border-bottom: 1px solid rgba(242, 238, 255, .9);
+  transform: rotate(45deg);
+}
+
 /* ---- Selection reveal ---- */
 .selectionLayer {
   position: absolute;
@@ -1409,6 +1445,7 @@
 }
 
 @media (max-width: 480px) {
+  .heroScrollCue { bottom: 54px; font-size: 9px; }
   .selectionContent { padding: 0.75rem; }
   .cardRank {
     top: 0.55rem;

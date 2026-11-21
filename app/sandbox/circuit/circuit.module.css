@@ -246,6 +246,11 @@
 .tutorialButton > span:first-child { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: white; }
 .tutorialEntry { position: relative; display: flex; }
 .tutorialNotice {
+  --notice-bg: #1c1725;
+  --notice-ink: #fbf9ff;
+  --notice-muted: #c8bfd5;
+  --notice-accent: #d8c9ff;
+  --notice-line: #b79af5;
   position: absolute;
   z-index: 80;
   top: calc(100% + 14px);
@@ -253,15 +258,20 @@
   width: min(300px, calc(100vw - 24px));
   box-sizing: border-box;
   padding: 15px 16px 16px;
-  border: 1px solid color-mix(in srgb, var(--pink) 32%, var(--line));
+  border: 1px solid var(--notice-line);
   border-radius: 16px;
-  color: var(--ink);
-  background:
-    radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--pink) 16%, transparent), transparent 42%),
-    color-mix(in srgb, var(--surface-strong) 96%, transparent);
+  color: var(--notice-ink);
+  background: radial-gradient(circle at 90% 10%, rgba(181, 141, 255, .2), transparent 48%), var(--notice-bg);
   box-shadow: 0 20px 52px rgba(9, 5, 15, .28), 0 0 34px color-mix(in srgb, var(--pink) 9%, transparent);
-  backdrop-filter: blur(24px) saturate(1.25);
   animation: tutorialNoticeIn 360ms cubic-bezier(.2, .8, .2, 1) both;
+}
+.shell[data-theme='dark'] .tutorialNotice {
+  --notice-bg: #fffdfd;
+  --notice-ink: #221a2b;
+  --notice-muted: #5d5367;
+  --notice-accent: #5a36bd;
+  --notice-line: #8c68df;
+  background: radial-gradient(circle at 90% 10%, rgba(207, 185, 255, .38), transparent 48%), var(--notice-bg);
 }
 .tutorialNotice::before {
   content: '';
@@ -270,9 +280,9 @@
   bottom: 100%;
   width: 12px;
   height: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--pink) 32%, var(--line));
-  border-left: 1px solid color-mix(in srgb, var(--pink) 32%, var(--line));
-  background: var(--surface-strong);
+  border-top: 1px solid var(--notice-line);
+  border-left: 1px solid var(--notice-line);
+  background: var(--notice-bg);
   transform: translateY(6px) rotate(45deg);
 }
 .tutorialNoticeTopline {
@@ -285,7 +295,7 @@
   margin-bottom: 12px;
 }
 .tutorialNoticeTopline > span {
-  color: var(--accent-strong);
+  color: var(--notice-accent);
   font: 800 .57rem/1 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: .12em;
 }
@@ -294,14 +304,14 @@
   padding: 3px 0;
   border: 0;
   border-radius: 0;
-  color: var(--muted);
+  color: var(--notice-muted);
   background: transparent;
   font: 750 .6rem/1 'JetBrains Mono', ui-monospace, monospace;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .topActions .tutorialNoticeDismiss:hover {
-  color: var(--ink);
+  color: var(--notice-ink);
   border-color: transparent;
   transform: none;
 }
@@ -316,7 +326,7 @@
   position: relative;
   z-index: 1;
   margin: 7px 0 0;
-  color: var(--muted);
+  color: var(--notice-muted);
   font-size: .72rem;
   line-height: 1.5;
 }
@@ -603,8 +613,8 @@
   color: var(--muted);
   font: 700 .67rem/1.4 'JetBrains Mono', monospace;
 }
-.composerFooter > span { display: flex; align-items: center; gap: 8px; }
-.composerFooter > span i { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 13%, transparent); }
+.composerFooter > output { display: flex; align-items: center; gap: 8px; }
+.composerFooter > output i { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 13%, transparent); }
 .composerFooter > div { display: flex; gap: 7px; }
 .hiddenInput { display: none; }
 
@@ -796,6 +806,23 @@
   background: rgba(6, 5, 10, .7);
   backdrop-filter: blur(18px);
 }
+.limitDialog {
+  position: relative;
+  width: min(360px, 100%);
+  margin: 0;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  color: var(--ink);
+  background: var(--solid);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .35);
+}
+.limitIcon { width: 34px; height: 34px; display: grid; place-items: center; margin-bottom: 17px; border-radius: 50%; color: #a1223a; background: #ffe5eb; font: 900 19px/1 'JetBrains Mono', monospace; }
+.limitDialog h2 { margin: 8px 0; font-size: 1.4rem; letter-spacing: -.04em; }
+.limitDialog p { margin: 0 0 22px; color: var(--muted); font-size: .84rem; line-height: 1.5; }
+.limitDialog button { min-width: 100px; min-height: 40px; padding: 9px 17px; border: 0; border-radius: 10px; color: white; background: #17151e; font-size: .77rem; font-weight: 800; cursor: pointer; }
+.limitDialog button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.shell[data-theme='dark'] .limitIcon { color: #ffb4c2; background: #4c2a38; }
 .matrixGuide {
   position: relative;
   width: min(900px, 100%);

@@ -14,6 +14,7 @@ import AtomLogo from '@/components/AtomLogo';
 import InteractiveBrand from '@/components/InteractiveBrand';
 import ThemeToggle from '@/components/ThemeToggle';
 import styles from './circuit.module.css';
+import { circuitPng, toQiskit, type SavedCircuit } from './circuit-export';
 import {
   GATES,
   GATE_MAP,
@@ -41,6 +42,9 @@ type GateTooltipState = {
 };
 
 const INITIAL_CIRCUIT: Circuit = { qubits: 2, columns: 8, gates: [] };
+const MAX_QUBITS = 5;
+const MAX_COLUMNS = 16;
+const MAX_GATES = 40;
 const GROUPS = ['Essentials', 'Phase', 'Rotations', 'Controlled', 'Interactions', 'Utility'] as const;
 const CONTROLLED_GATES = new Set(['cx', 'cz', 'cp', 'crx', 'cry', 'crz']);
 const TUTORIAL_STEPS = [
@@ -48,7 +52,7 @@ const TUTORIAL_STEPS = [
     target: 'header',
     eyebrow: 'Welcome to the workbench',
     title: 'Your circuit, your way.',
-    copy: 'Open this guided tour whenever you need a refresher. Rename the circuit by clicking its title, switch themes, undo edits, restore a saved draft, or save locally from this bar.',
+    copy: 'Open this guided tour whenever you need a refresher. Rename the circuit by clicking its title, switch themes, undo edits, restore a saved draft, or download a ZIP from this bar.',
   },
   {
     target: 'gates',
@@ -96,7 +100,7 @@ const TUTORIAL_STEPS = [
     target: 'files',
     eyebrow: 'Keep your work',
     title: 'Save, move, and return.',
-    copy: 'Save a named circuit in this browser, export a portable JSON file, or import one later. Your circuit remains local unless you explicitly export it.',
+    copy: 'Save a ZIP with a circuit PNG, OpenQASM 3, JSON, and Qiskit Python code. Restore your last saved draft in this browser or import the JSON later.',
   },
 ] as const;
 
@@ -104,6 +108,37 @@ function createId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`;
+}
+
+function readCircuit(value: unknown): SavedCircuit {
+  if (!value || typeof value !== 'object') throw new Error('Invalid circuit');
+  const candidate = value as Partial<SavedCircuit>;
+  if (!Number.isInteger(candidate.qubits) || candidate.qubits! < 2 || candidate.qubits! > MAX_QUBITS ||
+      !Number.isInteger(candidate.columns) || candidate.columns! < 4 || candidate.columns! > MAX_COLUMNS ||
+      !Array.isArray(candidate.gates) || candidate.gates.length > MAX_GATES) throw new Error('Invalid circuit');
+  const occupied = new Set<string>();
+  for (const gate of candidate.gates) {
+    const definition = GATE_MAP.get(gate.gateId);
+    if (!definition || typeof gate.id !== 'string' || !Number.isInteger(gate.column) ||
+        gate.column < 0 || gate.column >= candidate.columns! ||
+        !Array.isArray(gate.targets) || gate.targets.length !== definition.arity ||
+        gate.targets.some((target) => !Number.isInteger(target) || target < 0 || target >= candidate.qubits!) ||
+        new Set(gate.targets).size !== gate.targets.length ||
+        (definition.parameter && (gate.parameter !== undefined && !Number.isFinite(gate.parameter)))) {
+      throw new Error('Invalid circuit');
+    }
+    for (const target of gate.targets) {
+      const slot = `${gate.column}:${target}`;
+      if (occupied.has(slot)) throw new Error('Invalid circuit');
+      occupied.add(slot);
+    }
+  }
+  return {
+    name: typeof candidate.name === 'string' ? candidate.name.trim().slice(0, 64) || 'Untitled circuit' : 'Untitled circuit',
+    qubits: candidate.qubits!,
+    columns: candidate.columns!,
+    gates: candidate.gates,
+  };
 }
 
 function MatrixView({ matrix, label }: { matrix: Matrix; label: string }) {
@@ -192,6 +227,8 @@ export default function CircuitComposer() {
   const [shots, setShots] = useState(1024);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [toast, setToast] = useState('Empty two-qubit circuit ready');
+  const [limitError, setLimitError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialNoticeOpen, setTutorialNoticeOpen] = useState(true);
   const [tutorialStep, setTutorialStep] = useState(0);
@@ -199,6 +236,7 @@ export default function CircuitComposer() {
   const [gateTooltip, setGateTooltip] = useState<GateTooltipState | null>(null);
   const [matrixInfoOpen, setMatrixInfoOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+  const limitCloseRef = useRef<HTMLButtonElement>(null);
 
   const simulation = useMemo(() => simulateCircuit(circuit.gates, circuit.qubits), [circuit]);
   const qasm = useMemo(() => toQasm(circuit.gates, circuit.qubits), [circuit]);
@@ -247,6 +285,7 @@ export default function CircuitComposer() {
     setPast((history) => [...history.slice(-39), circuit]);
     setCircuit(next);
     setFuture([]);
+    setLimitError(null);
     if (message) setToast(message);
   }, [circuit]);
 
@@ -277,7 +316,24 @@ export default function CircuitComposer() {
   }, [circuit, commit]);
 
   useEffect(() => {
+    if (!limitError) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    limitCloseRef.current?.focus();
+    return () => previousFocus?.focus();
+  }, [limitError]);
+
+  useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
+      if (limitError) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setLimitError(null);
+        } else if (event.key === 'Tab') {
+          event.preventDefault();
+          limitCloseRef.current?.focus();
+        }
+        return;
+      }
       const target = event.target as HTMLElement;
       if (target.matches('input, textarea, select')) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
@@ -295,7 +351,7 @@ export default function CircuitComposer() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [redo, removeGate, selectedGateId, undo]);
+  }, [limitError, redo, removeGate, selectedGateId, undo]);
 
   useEffect(() => {
     if (!tutorialOpen) return;
@@ -372,6 +428,10 @@ export default function CircuitComposer() {
   const placeGate = (gateId: string, column: number, qubit: number) => {
     const definition = GATE_MAP.get(gateId);
     if (!definition) return;
+    if (circuit.gates.length >= MAX_GATES) {
+      setLimitError(`Gate limit reached: a circuit can contain up to ${MAX_GATES} gates.`);
+      return;
+    }
     if (definition.arity === 2) {
       if (!pendingPair || pendingPair.gateId !== gateId || pendingPair.column !== column) {
         if (isOccupied(column, [qubit])) return setToast('That time slot is occupied');
@@ -386,6 +446,7 @@ export default function CircuitComposer() {
         parameter: definition.defaultParameter,
       };
       commit({ ...circuit, gates: [...circuit.gates, gate] }, `${definition.label} connected`);
+      if (circuit.gates.length + 1 === MAX_GATES) setLimitError(`Gate limit reached: a circuit can contain up to ${MAX_GATES} gates.`);
       setSelectedGateId(gate.id);
       setPendingPair(null);
       setSelectedStep(simulation.steps.length);
@@ -396,6 +457,7 @@ export default function CircuitComposer() {
       id: createId(), gateId, column, targets: [qubit], parameter: definition.defaultParameter,
     };
     commit({ ...circuit, gates: [...circuit.gates, gate] }, `${definition.label} added`);
+    if (circuit.gates.length + 1 === MAX_GATES) setLimitError(`Gate limit reached: a circuit can contain up to ${MAX_GATES} gates.`);
     setSelectedGateId(gate.id);
     setPendingPair(null);
     setSelectedStep(simulation.steps.length);
@@ -412,13 +474,18 @@ export default function CircuitComposer() {
   };
 
   const resizeQubits = (delta: number) => {
-    const nextCount = Math.max(2, Math.min(5, circuit.qubits + delta));
-    if (nextCount === circuit.qubits) return setToast(delta > 0 ? 'Five-qubit limit reached' : 'The playground keeps at least two qubits');
+    const nextCount = Math.max(2, Math.min(MAX_QUBITS, circuit.qubits + delta));
+    if (nextCount === circuit.qubits) {
+      if (delta > 0) setLimitError(`Qubit limit reached: a circuit can contain up to ${MAX_QUBITS} qubits.`);
+      else setToast('The playground keeps at least two qubits');
+      return;
+    }
     commit({
       ...circuit,
       qubits: nextCount,
       gates: circuit.gates.filter((gate) => gate.targets.every((target) => target < nextCount)),
     }, `${nextCount} qubits active`);
+    if (nextCount === MAX_QUBITS) setLimitError(`Qubit limit reached: a circuit can contain up to ${MAX_QUBITS} qubits.`);
     setSphereQubit((current) => Math.min(current, nextCount - 1));
     setSelectedGateId(null);
   };
@@ -444,46 +511,69 @@ export default function CircuitComposer() {
     setCounts({});
   };
 
-  const saveCircuit = () => {
-    localStorage.setItem('qquest-circuit', JSON.stringify({ name: circuitName, ...circuit }));
-    setToast(`“${circuitName}” saved on this device`);
+  const saveCircuit = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const saved: SavedCircuit = { name: circuitName.trim() || 'Untitled circuit', ...circuit };
+      const basename = saved.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'q-quest-circuit';
+      const [png, { default: JSZip }] = await Promise.all([circuitPng(saved), import('jszip')]);
+      const zip = new JSZip();
+      zip.file(`${basename}.png`, png);
+      zip.file(`${basename}.qasm`, toQasm(circuit.gates, circuit.qubits));
+      zip.file(`${basename}.json`, JSON.stringify(saved, null, 2));
+      zip.file(`${basename}.py`, toQiskit(saved));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${basename}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      try { localStorage.setItem('qquest-circuit', JSON.stringify(saved)); } catch { /* Download remains available when storage is disabled. */ }
+      setLimitError(null);
+      setToast('ZIP downloaded with PNG, QASM, JSON, and Qiskit code');
+    } catch {
+      setLimitError('Could not create the circuit ZIP. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadSavedCircuit = () => {
-    const saved = localStorage.getItem('qquest-circuit');
-    if (!saved) return setToast('No local circuit found');
     try {
-      const parsed = JSON.parse(saved) as Circuit & { name?: string };
-      if (!Array.isArray(parsed.gates) || parsed.qubits < 2 || parsed.qubits > 5) throw new Error('Invalid circuit');
+      const saved = localStorage.getItem('qquest-circuit');
+      if (!saved) return setToast('No local circuit found');
+      const parsed = readCircuit(JSON.parse(saved));
       commit({ qubits: parsed.qubits, columns: parsed.columns, gates: parsed.gates }, 'Local circuit restored');
-      setCircuitName(parsed.name?.trim() || 'Untitled circuit');
+      setCircuitName(parsed.name);
       setSelectedGateId(null);
+      setPendingPair(null);
+      setSphereQubit(0);
+      setSelectedStep(0);
+      setCounts({});
     } catch {
       setToast('Saved circuit could not be read');
     }
   };
 
-  const exportCircuit = () => {
-    const blob = new Blob([JSON.stringify({ name: circuitName, ...circuit }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${circuitName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'q-quest-circuit'}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setToast('Circuit JSON exported');
-  };
-
   const importCircuit = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const next = JSON.parse(await file.text()) as Circuit & { name?: string };
-      if (!Array.isArray(next.gates) || next.qubits < 2 || next.qubits > 5) throw new Error('Invalid circuit');
+      const next = readCircuit(JSON.parse(await file.text()));
       commit({ qubits: next.qubits, columns: next.columns, gates: next.gates }, 'Circuit imported');
-      setCircuitName(next.name?.trim() || file.name.replace(/\.json$/i, '') || 'Imported circuit');
+      setCircuitName(next.name || file.name.replace(/\.json$/i, '') || 'Imported circuit');
       setSelectedGateId(null);
+      setPendingPair(null);
+      setSphereQubit(0);
+      setSelectedStep(0);
+      setCounts({});
     } catch {
       setToast('That file is not a valid Q-Quest circuit');
+    } finally {
+      if (importRef.current) importRef.current.value = '';
     }
   };
 
@@ -593,7 +683,7 @@ export default function CircuitComposer() {
           <button type="button" onClick={undo} disabled={!past.length} aria-label="Undo">↶</button>
           <button type="button" onClick={redo} disabled={!future.length} aria-label="Redo">↷</button>
           <button type="button" onClick={loadSavedCircuit}>Restore</button>
-          <button type="button" className={styles.saveButton} onClick={saveCircuit}>Save local</button>
+          <button type="button" className={styles.saveButton} onClick={saveCircuit} disabled={saving}>{saving ? 'Creating ZIP…' : 'Save ZIP'}</button>
         </div>
       </header>
 
@@ -670,12 +760,19 @@ export default function CircuitComposer() {
                 {pendingPair ? `SELECT PARTNER · T${pendingPair.column + 1}` : `${selectedDefinition.symbol} · ${selectedDefinition.label}`}
               </div>
               <div className={styles.toolbarButtons}>
-                <button type="button" onClick={() => commit({ ...circuit, columns: Math.max(4, circuit.columns - 1) })}>− slice</button>
-                <button type="button" onClick={() => commit({ ...circuit, columns: Math.min(16, circuit.columns + 1) })}>+ slice</button>
+                <button type="button" onClick={() => {
+                  const lastGateColumn = Math.max(-1, ...circuit.gates.map((gate) => gate.column));
+                  if (circuit.columns <= 4 || lastGateColumn >= circuit.columns - 1) return setToast('Remove gates from the last time slice first');
+                  commit({ ...circuit, columns: circuit.columns - 1 }, 'Time slice removed');
+                }}>− slice</button>
+                <button type="button" onClick={() => {
+                  if (circuit.columns >= MAX_COLUMNS) return setLimitError(`Timeline limit reached: up to ${MAX_COLUMNS} gate columns are available.`);
+                  commit({ ...circuit, columns: circuit.columns + 1 }, 'Time slice added');
+                  if (circuit.columns + 1 === MAX_COLUMNS) setLimitError(`Timeline limit reached: up to ${MAX_COLUMNS} gate columns are available.`);
+                }}>+ slice</button>
                 <button type="button" className={styles.dangerButton} onClick={clearCircuit}>Clear</button>
               </div>
             </div>
-
             <div className={styles.circuitFrame} data-tour="canvas">
               <div className={styles.circuitTexture} aria-hidden="true" />
               <div className={styles.circuitCanvas} style={{ '--columns': circuit.columns } as CSSProperties}>
@@ -740,10 +837,10 @@ export default function CircuitComposer() {
             </div>
 
             <div className={styles.composerFooter} data-tour="files">
-              <span><i />{toast}</span>
+              <output><i />{toast}</output>
               <div>
                 <button type="button" onClick={() => importRef.current?.click()}>Import</button>
-                <button type="button" onClick={exportCircuit}>Export JSON</button>
+                <button type="button" onClick={saveCircuit} disabled={saving}>{saving ? 'Creating ZIP…' : 'Download ZIP'}</button>
                 <input ref={importRef} className={styles.hiddenInput} type="file" accept="application/json,.json" onChange={(event) => importCircuit(event.target.files?.[0])} />
                 <button type="button" className={styles.runButton} onClick={runShots}>Run simulation</button>
               </div>
@@ -883,6 +980,20 @@ export default function CircuitComposer() {
           </em>
         </div>,
         document.body
+      )}
+
+      {limitError && (
+        <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => {
+          if (event.currentTarget === event.target) setLimitError(null);
+        }}>
+          <dialog open role="alertdialog" aria-modal="true" aria-labelledby="limit-title" aria-describedby="limit-description" className={styles.limitDialog}>
+            <span className={styles.limitIcon} aria-hidden="true">!</span>
+            <span className={styles.kicker}>CIRCUIT LIMIT</span>
+            <h2 id="limit-title">Limit reached</h2>
+            <p id="limit-description">{limitError}</p>
+            <button ref={limitCloseRef} type="button" onClick={() => setLimitError(null)}>Got it</button>
+          </dialog>
+        </div>
       )}
 
       {tutorialOpen && (

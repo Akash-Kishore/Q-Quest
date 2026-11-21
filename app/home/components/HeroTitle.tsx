@@ -30,6 +30,7 @@ export default function HeroTitle() {
   const techTLRef = useRef<HTMLDivElement>(null);
   const techTRRef = useRef<HTMLDivElement>(null);
   const techBLRef = useRef<HTMLDivElement>(null);
+  const scrollCueRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (reducedMotion) {
@@ -58,6 +59,10 @@ export default function HeroTitle() {
       inner.style.transform = `translateY(${titleY}vh)`;
       // Opacity is ALWAYS 1.0 — title exits by position, not by fading
       inner.style.opacity = '1';
+
+      if (scrollCueRef.current) {
+        scrollCueRef.current.style.opacity = String(1 - rangeProgress(progress, 0.01, 0.09));
+      }
 
       // Hide layer entirely when off-screen for performance
       if (layerRef.current) {
@@ -108,6 +113,10 @@ export default function HeroTitle() {
       </div>
       <div ref={techBLRef} className={`${styles.heroTechOverlay} ${styles.heroTechBL}`}>
         DEEP_SPACE_PULSE: 0xFF
+      </div>
+      <div ref={scrollCueRef} className={styles.heroScrollCue}>
+        <span>SCROLL TO EXPLORE</span>
+        <span className={styles.heroScrollArrow} aria-hidden="true" />
       </div>
     </div>
   );

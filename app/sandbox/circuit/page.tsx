@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import CircuitComposer from './CircuitComposer';
+import CircuitWorkbench from './CircuitWorkbench';
 
 export const metadata: Metadata = {
   title: 'Quantum Circuit Playground · Q-Quest',
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function CircuitSandboxPage() {
-  return <CircuitComposer />;
+  return <CircuitWorkbench />;
 }
