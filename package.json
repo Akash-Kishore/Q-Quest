@@ -1,6 +1,9 @@
 {
   "name": "q-quest",
   "version": "0.1.0",
+  "description": "An interactive, browser-based quantum computing learning environment and circuit simulator.",
+  "author": "Akash Kishore",
+  "license": "UNLICENSED",
   "private": true,
   "type": "module",
   "scripts": {

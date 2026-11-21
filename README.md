@@ -137,9 +137,11 @@ No site URL is claimed here until a deployment has actually succeeded.
 
 Issues and pull requests are welcome. For a code change, create a branch, keep the change focused, and run the quality checks above before submitting a PR. Explain any impact on simulator correctness, accessibility, or performance.
 
-## License
+## Copyright and licensing
 
-**No open-source license has been declared in this repository.** Public GitHub visibility does not itself grant permission to reuse or redistribute the code. A license can be added by the project owner when ready.
+Copyright © 2026 Akash Kishore. Q-Quest's eligible original source code, documentation, visual materials, and written content are proprietary and all rights are reserved, subject to applicable statutory rights, third-party licenses, and any express written permissions. Public source availability does not grant a general right to copy, modify, redistribute, sublicense, or commercially exploit the project.
+
+See the project [copyright notice](COPYRIGHT.md), [proprietary license](LICENSE), [ownership notice](NOTICE.md), [third-party notices](THIRD_PARTY_NOTICES.md), and [IP policy](docs/IP_POLICY.md). These notices are not a government copyright registration and do not claim protection over ideas, methods, ordinary functionality, or the Q-Quest name by itself.
 
 ## Creator
 

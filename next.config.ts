@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  productionBrowserSourceMaps: false,
   allowedDevOrigins: ['192.168.29.156'],
   images: {
     remotePatterns: [

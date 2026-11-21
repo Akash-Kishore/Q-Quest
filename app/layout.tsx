@@ -3,8 +3,12 @@ import ScrollReset from "@/components/ScrollReset";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  applicationName: "Q-QUEST",
   title: "Q-QUEST",
-  description: "Quantum Explorations",
+  description: "An interactive quantum computing learning environment and browser-based circuit simulator.",
+  authors: [{ name: "Akash Kishore", url: "https://github.com/Akash-Kishore" }],
+  creator: "Akash Kishore",
+  publisher: "Akash Kishore",
 };
 
 export const viewport: Viewport = {

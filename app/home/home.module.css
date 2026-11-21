@@ -234,6 +234,18 @@
 
 .aboutIdentity small { margin-top: 0.65rem; }
 
+.aboutCopyright {
+  max-width: 18rem;
+  margin-top: 0.35rem;
+  color: rgba(249, 243, 255, 0.58);
+  font: 500 0.6rem/1.55 'JetBrains Mono', monospace;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.aboutCopyright:hover { color: #fff; }
+
 .aboutLinkColumn > span { color: #d7b7ff; margin-bottom: 0.45rem; }
 .aboutLinkColumn a,
 .aboutLinkColumn p {
