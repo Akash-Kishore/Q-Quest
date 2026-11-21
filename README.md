@@ -27,12 +27,13 @@ Q-QUEST is an interactive, beginner-friendly quantum computing learning environm
 - Inspect a selected qubit's Bloch-vector coordinates, measurement probabilities, gate matrices, and circuit evolution.
 - Generate and copy OpenQASM 3 text from a circuit.
 - Use sample circuits, the guided interface tour, and editing controls.
-- Save circuit drafts in the browser and export/import portable JSON files.
+- Download a ZIP containing the circuit PNG, OpenQASM 3, JSON, and Qiskit Python code. Restore the last saved draft in the browser or import its JSON file.
+- See clear popup messages when the workbench reaches its qubit, gate, or timeline limits.
 
 The simulator is educational software running in the browser, **not a connection to a physical quantum processor**. It should not be represented as a general-purpose or noise-aware quantum computer.
 
 ### Website and learning resources
-- Cinematic transitions, scrolling interactions, 3D scenes, and motion effects.
+- Cinematic transitions, a clear opening scroll cue, scrolling interactions, 3D scenes, and motion effects.
 - Responsive pages and a configurable theme in supported sections.
 - Research resources that retrieve recent posts from the [Beyond the Bit](https://beyond-the-bit.hashnode.dev/) RSS feed. Feed availability and external images depend on the external source.
 - An About page and links to the source repository.
