@@ -45,7 +45,7 @@ export default function AboutTeaser() {
           <strong>Akash Kishore</strong>
           <span>Creator of Q-QUEST</span>
           <small>Make difficult ideas tangible.</small>
-          <Link className={styles.aboutCopyright} href="/copyright">
+          <Link className={styles.aboutCopyright} href="/website-resources#copyright">
             © 2026 Akash Kishore. Q-Quest. All rights reserved.
           </Link>
         </div>
@@ -56,8 +56,7 @@ export default function AboutTeaser() {
           <Link href="/about">About</Link>
           <Link href="/sandbox/circuit">Circuit playground</Link>
           <Link href="/sandbox/research">Resources</Link>
-          <Link href="/website-resources">Website resources</Link>
-          <Link href="/copyright">Copyright &amp; IP</Link>
+          <Link href="/website-resources">Resources &amp; copyright</Link>
         </div>
 
         <div className={styles.aboutLinkColumn}>

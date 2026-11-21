@@ -55,7 +55,7 @@ export default function AboutPage() {
         />
         <div className={styles.navLinks}>
           <Link href="/home">Home</Link>
-          <Link href="/website-resources">Website resources</Link>
+          <Link href="/website-resources">Resources &amp; copyright</Link>
           <Link href="/sandbox/circuit">Playground</Link>
           <Link href="/sandbox/research">Learning resources</Link>
         </div>

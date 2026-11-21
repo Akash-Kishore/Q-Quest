@@ -16,7 +16,7 @@ Q-QUEST is an interactive, beginner-friendly quantum computing learning environm
 | `/sandbox/circuit` | Quantum circuit builder and simulator |
 | `/sandbox/research` | Quantum learning resources sourced from *Beyond the Bit* |
 | `/about` | Project and creator information |
-| `/website-resources` | Links to the project source |
+| `/website-resources` | Project source, copyright, and permission information |
 
 ## Current features
 
