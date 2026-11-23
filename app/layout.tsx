@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from '@vercel/analytics/next';
 import ScrollReset from "@/components/ScrollReset";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body>
         <ScrollReset />
         {children}
+        <Analytics />
       </body>
     </html>
   );
